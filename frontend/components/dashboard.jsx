@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AIAgent from "./AIAgent";
+import AssetsView from "./AssetsView";
 import {
   Activity,
   AlertTriangle,
@@ -381,6 +382,8 @@ function OverviewChart({ points, loading, error, onRefresh, lastUpdated }) {
 
 export default function Dashboard() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("Overview");
+  const [activeAnomaly, setActiveAnomaly] = useState(null);
   const [chartPoints, setChartPoints] = useState(fallbackChartPoints);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState("");
@@ -458,6 +461,7 @@ export default function Dashboard() {
 
             {essentialTabs.map((tab) => {
               const Icon = tab.icon;
+              const isActive = tab.label === activeTab;
 
               return (
                 <Button
@@ -468,9 +472,12 @@ export default function Dashboard() {
                   className={cn(
                     "h-auto w-full flex-col items-start gap-1 px-3 py-2.5",
                     "hover:bg-grid-elevated",
-                    tab.active && "bg-grid-elevated",
+                    isActive && "bg-grid-elevated",
                   )}
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={() => {
+                    setActiveTab(tab.label);
+                    setSidebarOpen(false);
+                  }}
                 >
                   <span className="inline-flex items-center gap-2">
                     <Icon className="size-3.5 text-grid-muted" />
@@ -537,9 +544,30 @@ export default function Dashboard() {
           </header>
 
           <main className="space-y-6 px-4 pb-8 pt-5 sm:px-6 lg:px-8">
+            {activeTab === "AI Assistant" ? (
+              <AIAgent 
+                contextAnomaly={activeAnomaly} 
+                onClearContext={() => setActiveAnomaly(null)} 
+              />
+            ) : activeTab === "Assets" ? (
+              <AssetsView 
+                onInvestigateAsset={(asset) => {
+                  setActiveAnomaly({
+                    id: asset.id,
+                    title: `Asset: ${asset.name}`,
+                    severity: asset.health === "Healthy" ? "Info" : asset.health === "Degraded" ? "Warning" : "Critical",
+                    asset: asset.id,
+                    status: "Open",
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  });
+                  setActiveTab("AI Assistant");
+                }}
+              />
+            ) : (
+              <>
             <section className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-4xl font-semibold tracking-tight">Overview</h1>
+                <h1 className="text-4xl font-semibold tracking-tight">{activeTab}</h1>
               </div>
 
               <article className="rounded-xl border border-grid-border bg-grid-surface p-4">
@@ -642,7 +670,15 @@ export default function Dashboard() {
 
                   <tbody>
                     {anomaliesTableRows.map((row) => (
-                      <tr key={row.id} className="rounded-lg text-grid-title odd:bg-grid-page/50">
+                      <tr 
+                        key={row.id} 
+                        className="rounded-lg text-grid-title odd:bg-grid-page/50 cursor-pointer hover:bg-grid-elevated/50 transition-colors"
+                        title="Investigate with AI Assistant"
+                        onClick={() => {
+                          setActiveAnomaly(row);
+                          setActiveTab("AI Assistant");
+                        }}
+                      >
                         <td className="px-2 py-2 font-semibold">{row.id}</td>
                         <td className="px-2 py-2">{row.title}</td>
                         <td className="px-2 py-2">
@@ -659,6 +695,8 @@ export default function Dashboard() {
                 </table>
               </div>
             </section>
+              </>
+            )}
           </main>
         </div>
       </div>

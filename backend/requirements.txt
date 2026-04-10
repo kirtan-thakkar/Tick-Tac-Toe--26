@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+influxdb-client
+pydantic
+pydantic-settings
+python-dotenv
+pandas
+httpx
+redis
+upstash_redis

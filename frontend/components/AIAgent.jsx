@@ -5,7 +5,6 @@ import { Bot, Send } from "lucide-react";
 
 const AIAgent = ({ contextAnomaly, onClearContext }) => {
   const [submittedPrompt, setSubmittedPrompt] = useState("");
-
   const {
     completion,
     input,
