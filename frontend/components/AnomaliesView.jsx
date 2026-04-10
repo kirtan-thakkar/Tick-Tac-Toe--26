@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   AlertTriangle, 
   CheckCircle2, 
-  Clock, 
   Search, 
   ShieldAlert, 
   Bot,
-  Activity,
-  Filter
+  Filter,
+  Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence, LayoutGroup } from "motion/react";
 
 // Dummy data mirroring the dashboard table, but enriched
 const initialAnomalies = [
@@ -82,181 +82,231 @@ export default function AnomaliesView({ onInvestigate }) {
 
   useEffect(() => {
     // Simulate fetching enriched anomalies from backend
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setAnomalies(initialAnomalies);
       setLoading(false);
     }, 600);
+    return () => clearTimeout(timer);
   }, []);
 
-  const counts = {
+  const counts = useMemo(() => ({
     All: anomalies.length,
     Critical: anomalies.filter(a => a.severity === "Critical").length,
     Warning: anomalies.filter(a => a.severity === "Warning").length,
     Info: anomalies.filter(a => a.severity === "Info").length,
-  };
+  }), [anomalies]);
 
-  const filteredAnomalies = anomalies.filter(anomaly => {
-    const matchesSearch = anomaly.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          anomaly.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          anomaly.asset.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = activeFilter === "All" || anomaly.severity === activeFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredAnomalies = useMemo(() => {
+    return anomalies.filter(anomaly => {
+      const matchesSearch = anomaly.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            anomaly.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            anomaly.asset.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter = activeFilter === "All" || anomaly.severity === activeFilter;
+      return matchesSearch && matchesFilter;
+    });
+  }, [anomalies, searchQuery, activeFilter]);
+
+  const filters = [
+    { id: "All", label: "All Events", count: counts.All },
+    { id: "Critical", label: "Critical", count: counts.Critical, color: "text-grid-danger" },
+    { id: "Warning", label: "Warning", count: counts.Warning, color: "text-grid-warning" },
+    { id: "Info", label: "Resolved", count: counts.Info, color: "text-grid-success" },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-8 max-w-6xl mx-auto">
+      {/* Header section with refined typography */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight">Anomalies</h1>
-          <p className="text-sm text-grid-muted mt-1">Triage and investigate detected system irregularities.</p>
+          <h1 className="text-3xl font-medium tracking-tight text-grid-title">Anomalies</h1>
+          <p className="text-sm text-grid-muted mt-2 max-w-md leading-relaxed">
+            Monitor and investigate system irregularities. Real-time telemetry paired with AI-driven hypothesis generation.
+          </p>
         </div>
       </div>
 
-      {/* Severity Filter Badges */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <button
-          onClick={() => setActiveFilter("All")}
-          className={cn(
-            "flex flex-col items-center justify-center p-4 rounded-xl border transition-all",
-            activeFilter === "All" 
-              ? "bg-grid-title text-grid-surface border-grid-title shadow-md scale-[1.02]" 
-              : "bg-grid-surface border-grid-border text-grid-muted hover:bg-grid-elevated"
-          )}
-        >
-          <Activity className="size-6 mb-2 opacity-80" />
-          <span className="text-2xl font-bold">{counts.All}</span>
-          <span className="text-xs uppercase tracking-wider font-semibold opacity-80 mt-1">All Events</span>
-        </button>
+      {/* Minimalist Controls: Filter Tabs & Search */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-2 border-b border-grid-border/40">
+        <div className="flex items-center gap-1 w-full sm:w-auto bg-grid-surface/50 p-1 rounded-lg border border-grid-border/30">
+          <LayoutGroup>
+            {filters.map((filter) => {
+              const isActive = activeFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  onClick={() => setActiveFilter(filter.id)}
+                  className={cn(
+                    "relative px-4 py-1.5 text-sm font-medium transition-colors rounded-md z-10",
+                    isActive ? "text-grid-title" : "text-grid-muted hover:text-grid-title/80"
+                  )}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeFilterBg"
+                      className="absolute inset-0 bg-grid-page rounded-md shadow-sm border border-grid-border/40 z-[-1]"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className={cn("relative z-10", isActive && filter.id !== "All" && filter.color)}>
+                      {filter.label}
+                    </span>
+                    <span className="relative z-10 text-[10px] bg-grid-surface/80 px-1.5 py-0.5 rounded-full border border-grid-border/20">
+                      {filter.count}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </LayoutGroup>
+        </div>
 
-        <button
-          onClick={() => setActiveFilter("Critical")}
-          className={cn(
-            "flex flex-col items-center justify-center p-4 rounded-xl border transition-all",
-            activeFilter === "Critical" 
-              ? "bg-grid-danger/20 border-grid-danger text-grid-danger shadow-md scale-[1.02]" 
-              : "bg-grid-surface border-grid-border text-grid-danger hover:bg-grid-danger/10"
-          )}
-        >
-          <ShieldAlert className="size-6 mb-2 opacity-80" />
-          <span className="text-2xl font-bold">{counts.Critical}</span>
-          <span className="text-xs uppercase tracking-wider font-semibold opacity-80 mt-1">Critical</span>
-        </button>
-
-        <button
-          onClick={() => setActiveFilter("Warning")}
-          className={cn(
-            "flex flex-col items-center justify-center p-4 rounded-xl border transition-all",
-            activeFilter === "Warning" 
-              ? "bg-grid-warning/20 border-grid-warning text-grid-warning shadow-md scale-[1.02]" 
-              : "bg-grid-surface border-grid-border text-grid-warning hover:bg-grid-warning/10"
-          )}
-        >
-          <AlertTriangle className="size-6 mb-2 opacity-80" />
-          <span className="text-2xl font-bold">{counts.Warning}</span>
-          <span className="text-xs uppercase tracking-wider font-semibold opacity-80 mt-1">Semi Risk / Warning</span>
-        </button>
-
-        <button
-          onClick={() => setActiveFilter("Info")}
-          className={cn(
-            "flex flex-col items-center justify-center p-4 rounded-xl border transition-all",
-            activeFilter === "Info" 
-              ? "bg-grid-success/20 border-grid-success text-grid-success shadow-md scale-[1.02]" 
-              : "bg-grid-surface border-grid-border text-grid-success hover:bg-grid-success/10"
-          )}
-        >
-          <CheckCircle2 className="size-6 mb-2 opacity-80" />
-          <span className="text-2xl font-bold">{counts.Info}</span>
-          <span className="text-xs uppercase tracking-wider font-semibold opacity-80 mt-1">Info / Resolved</span>
-        </button>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-grid-surface border border-grid-border p-4 rounded-xl">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-grid-muted" />
+        <div className="relative w-full sm:w-72 group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-grid-muted group-focus-within:text-grid-title transition-colors" />
           <input
             type="text"
-            placeholder="Search by ID, title, or asset..."
-            className="w-full pl-9 pr-4 py-2 bg-grid-page/50 border border-grid-border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-grid-title text-grid-title placeholder:text-grid-muted"
+            placeholder="Search anomalies..."
+            className="w-full pl-9 pr-4 py-2 bg-grid-surface/30 border border-grid-border/40 hover:border-grid-border/80 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-grid-title/30 text-grid-title placeholder:text-grid-muted transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
 
-      {/* Anomalies List */}
-      <div className="space-y-3">
-        {loading ? (
-          <div className="py-12 flex justify-center text-grid-muted">
-            <Activity className="size-6 animate-pulse" />
-          </div>
-        ) : filteredAnomalies.length > 0 ? (
-          filteredAnomalies.map((anomaly) => (
-            <div 
-              key={anomaly.id} 
-              className="bg-grid-surface border border-grid-border rounded-xl p-5 hover:border-grid-muted/30 transition-colors flex flex-col md:flex-row gap-6 md:items-center"
-            >
-              {/* Left Column: Icon & ID */}
-              <div className="flex items-start gap-4 md:w-1/4">
-                <div className={cn(
-                  "p-3 rounded-xl border flex-shrink-0",
-                  anomaly.severity === "Critical" ? "bg-grid-danger/10 border-grid-danger/30" :
-                  anomaly.severity === "Warning" ? "bg-grid-warning/10 border-grid-warning/30" :
-                  "bg-grid-success/10 border-grid-success/30"
-                )}>
-                  <SeverityIcon severity={anomaly.severity} className="size-6" />
-                </div>
-                <div>
-                  <p className="text-xs font-mono text-grid-muted mb-1">{anomaly.id}</p>
-                  <span className={cn(
-                    "inline-flex items-center gap-1 rounded text-[10px] font-bold uppercase tracking-wider px-2 py-0.5",
-                    anomaly.status === "Open" ? "bg-grid-danger/15 text-grid-danger" :
-                    anomaly.status === "Investigating" ? "bg-grid-warning/15 text-grid-warning" :
-                    "bg-grid-success/15 text-grid-success"
-                  )}>
-                    {anomaly.status}
-                  </span>
-                </div>
-              </div>
+      {/* Ultra-clean Table */}
+      <div className="bg-grid-surface/20 rounded-xl overflow-hidden ring-1 ring-grid-border/30">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead className="bg-grid-surface/40 text-grid-muted">
+              <tr>
+                <th className="px-6 py-4 font-medium text-xs tracking-wider">ID</th>
+                <th className="px-6 py-4 font-medium text-xs tracking-wider">Details</th>
+                <th className="px-6 py-4 font-medium text-xs tracking-wider">Asset</th>
+                <th className="px-6 py-4 font-medium text-xs tracking-wider">Status</th>
+                <th className="px-6 py-4 font-medium text-xs tracking-wider text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-grid-border/20">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {loading ? (
+                  <motion.tr
+                    key="loading"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <td colSpan={5} className="py-16 text-center text-grid-muted">
+                      <motion.div 
+                        animate={{ rotate: 360 }} 
+                        transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                        className="inline-block mb-3"
+                      >
+                        <Clock className="size-5 opacity-50" />
+                      </motion.div>
+                      <p className="text-sm">Syncing telemetry...</p>
+                    </td>
+                  </motion.tr>
+                ) : filteredAnomalies.length > 0 ? (
+                  filteredAnomalies.map((anomaly, index) => (
+                    <motion.tr
+                      layout
+                      key={anomaly.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 25,
+                        mass: 0.8,
+                        delay: index * 0.04 
+                      }}
+                      className="group hover:bg-grid-surface/60 transition-colors"
+                    >
+                      <td className="px-6 py-4 align-top w-32">
+                        <span className="font-mono text-[11px] text-grid-muted group-hover:text-grid-title/70 transition-colors">
+                          {anomaly.id}
+                        </span>
+                        <div className="mt-1.5 flex items-center text-[10px] text-grid-muted/70 gap-1 font-mono">
+                          <Clock className="size-3" /> {anomaly.timestamp}
+                        </div>
+                      </td>
+                      
+                      <td className="px-6 py-4 align-top max-w-md">
+                        <div className="flex items-start gap-3">
+                          <SeverityIcon severity={anomaly.severity} className="size-4 mt-0.5 shrink-0" />
+                          <div>
+                            <span className="font-medium text-grid-title block mb-1">{anomaly.title}</span>
+                            <span className="text-xs text-grid-muted/90 leading-relaxed block pr-4">
+                              {anomaly.hypothesis}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-              {/* Middle Column: Details */}
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center justify-between gap-4">
-                  <h3 className="font-semibold text-grid-title text-lg">{anomaly.title}</h3>
-                  <span className="text-xs font-medium text-grid-muted flex items-center gap-1 bg-grid-page/50 px-2 py-1 rounded">
-                    <Clock className="size-3" />
-                    {anomaly.timestamp} ({anomaly.duration})
-                  </span>
-                </div>
-                
-                <div className="bg-grid-page/40 p-3 rounded-lg border border-grid-border/50 text-sm">
-                  <p className="text-grid-muted mb-1"><span className="font-semibold text-grid-title">Asset:</span> {anomaly.asset}</p>
-                  <p className="text-grid-muted leading-relaxed"><span className="font-semibold text-grid-title">Hypothesis:</span> {anomaly.hypothesis}</p>
-                </div>
-              </div>
+                      <td className="px-6 py-4 align-top w-32">
+                        <span className="inline-flex font-mono text-xs text-grid-title/80">
+                          {anomaly.asset}
+                        </span>
+                      </td>
 
-              {/* Right Column: Actions */}
-              <div className="flex flex-row md:flex-col gap-2 md:w-48">
-                <Button 
-                  className="flex-1 w-full bg-grid-title text-grid-surface hover:opacity-90"
-                  onClick={() => onInvestigate(anomaly)}
-                >
-                  <Bot className="size-4 mr-2" />
-                  Ask AI
-                </Button>
-                <Button variant="outline" className="flex-1 w-full text-xs">
-                  Acknowledge
-                </Button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="py-12 flex flex-col items-center justify-center text-grid-muted border border-dashed border-grid-border rounded-xl">
-            <Filter className="size-8 mb-3 opacity-20" />
-            <p>No anomalies found matching your criteria.</p>
-          </div>
-        )}
+                      <td className="px-6 py-4 align-top w-32">
+                        <span className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full text-[10px] font-medium px-2 py-0.5",
+                          anomaly.status === "Open" ? "bg-grid-danger/10 text-grid-danger" :
+                          anomaly.status === "Investigating" ? "bg-grid-warning/10 text-grid-warning" :
+                          "bg-grid-success/10 text-grid-success"
+                        )}>
+                          <span className={cn(
+                            "size-1.5 rounded-full",
+                            anomaly.status === "Open" ? "bg-grid-danger" :
+                            anomaly.status === "Investigating" ? "bg-grid-warning" :
+                            "bg-grid-success"
+                          )} />
+                          {anomaly.status}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 align-top text-right w-32">
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => onInvestigate(anomaly)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-grid-title text-grid-surface rounded-md opacity-90 hover:opacity-100 transition-opacity"
+                        >
+                          <Bot className="size-3.5" />
+                          Analyze
+                        </motion.button>
+                      </td>
+                    </motion.tr>
+                  ))
+                ) : (
+                  <motion.tr
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <td colSpan={5} className="py-16 text-center text-grid-muted">
+                      <Filter className="size-6 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm">No anomalies matching your criteria.</p>
+                      <Button 
+                        variant="link" 
+                        onClick={() => {
+                          setSearchQuery("");
+                          setActiveFilter("All");
+                        }}
+                        className="text-xs mt-2 text-grid-title/70 hover:text-grid-title"
+                      >
+                        Clear filters
+                      </Button>
+                    </td>
+                  </motion.tr>
+                )}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
