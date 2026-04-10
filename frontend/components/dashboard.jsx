@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AIAgent from "./AIAgent";
 import {
   Activity,
   AlertTriangle,
