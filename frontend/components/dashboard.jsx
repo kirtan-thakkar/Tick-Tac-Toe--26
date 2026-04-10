@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AIAgent from "./AIAgent";
 import AssetsView from "./AssetsView";
+import AnomaliesView from "./AnomaliesView";
+import { useGSAP } from "@gsap/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   Activity,
   AlertTriangle,
@@ -23,12 +26,16 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 import { AnimatedList } from "@/components/ui/animated-list";
 import { BentoGrid } from "@/components/ui/bento-grid";
 import { Button } from "@/components/ui/button";
 import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import { cn } from "@/lib/utils";
+
+gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 const essentialTabs = [
   {
@@ -381,6 +388,7 @@ function OverviewChart({ points, loading, error, onRefresh, lastUpdated }) {
 }
 
 export default function Dashboard() {
+  const rootRef = useRef(null);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Overview");
   const [activeAnomaly, setActiveAnomaly] = useState(null);
@@ -423,8 +431,80 @@ export default function Dashboard() {
     fetchChartData();
   }, []);
 
+  useGSAP(
+    () => {
+      if (activeTab === "AI Assistant" || activeTab === "Assets") {
+        return;
+      }
+
+      const cards = gsap.utils.toArray(".js-animate-card");
+      if (cards.length > 0) {
+        ScrollTrigger.batch(cards, {
+          start: "top 86%",
+          onEnter: (elements) => {
+            gsap.fromTo(
+              elements,
+              { autoAlpha: 0, y: 26 },
+              {
+                autoAlpha: 1,
+                y: 0,
+                duration: 0.65,
+                ease: "power2.out",
+                stagger: 0.1,
+                overwrite: true,
+              },
+            );
+          },
+          onLeaveBack: (elements) => {
+            gsap.to(elements, {
+              autoAlpha: 0.55,
+              y: 12,
+              duration: 0.28,
+              stagger: 0.05,
+              overwrite: true,
+            });
+          },
+        });
+      }
+
+      gsap.fromTo(
+        ".js-overview-title",
+        { autoAlpha: 0, yPercent: 50 },
+        {
+          autoAlpha: 1,
+          yPercent: 0,
+          duration: 0.8,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: ".js-overview-title",
+            start: "top 88%",
+            toggleActions: "play none none reverse",
+          },
+        },
+      );
+
+      gsap.fromTo(
+        ".js-overview-chart",
+        { clipPath: "inset(0 0 100% 0 round 12px)", autoAlpha: 0.5 },
+        {
+          clipPath: "inset(0 0 0% 0 round 12px)",
+          autoAlpha: 1,
+          duration: 1,
+          ease: "power1.inOut",
+          scrollTrigger: {
+            trigger: ".js-overview-chart",
+            start: "top 85%",
+            end: "top 45%",
+            scrub: 0.9,
+          },
+        },
+      );
+    },
+    { scope: rootRef, dependencies: [activeTab, chartPoints.length] },
+  );
+
   return (
-    <div className="min-h-screen bg-grid-page text-grid-title">
+    <div ref={rootRef} className="min-h-screen bg-grid-page text-grid-title">
       <div className="mx-auto flex min-h-screen max-w-[1600px]">
         <aside
           className={cn(
@@ -479,10 +559,16 @@ export default function Dashboard() {
                     setSidebarOpen(false);
                   }}
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <Icon className="size-3.5 text-grid-muted" />
+                  <motion.span
+                    className="inline-flex items-center gap-2"
+                    whileHover={{ x: 1.5 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                  >
+                    <motion.span whileHover={{ rotate: -7, scale: 1.06 }} transition={{ duration: 0.2 }}>
+                      <Icon className="size-3.5 text-grid-muted" />
+                    </motion.span>
                     <span className="text-[0.83rem] font-semibold text-grid-title">{tab.label}</span>
-                  </span>
+                  </motion.span>
                   <span className="pl-5 text-left text-[0.68rem] leading-snug text-grid-muted">
                     {tab.description}
                   </span>
@@ -544,33 +630,72 @@ export default function Dashboard() {
           </header>
 
           <main className="space-y-6 px-4 pb-8 pt-5 sm:px-6 lg:px-8">
-            {activeTab === "AI Assistant" ? (
-              <AIAgent 
-                contextAnomaly={activeAnomaly} 
-                onClearContext={() => setActiveAnomaly(null)} 
-              />
-            ) : activeTab === "Assets" ? (
-              <AssetsView 
-                onInvestigateAsset={(asset) => {
-                  setActiveAnomaly({
-                    id: asset.id,
-                    title: `Asset: ${asset.name}`,
-                    severity: asset.health === "Healthy" ? "Info" : asset.health === "Degraded" ? "Warning" : "Critical",
-                    asset: asset.id,
-                    status: "Open",
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  });
-                  setActiveTab("AI Assistant");
-                }}
-              />
-            ) : (
-              <>
-            <section className="space-y-4">
+            <AnimatePresence mode="wait" initial={false}>
+              {activeTab === "AI Assistant" ? (
+                <motion.div
+                  key="tab-ai-assistant"
+                  initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -8, filter: "blur(8px)" }}
+                  transition={{ duration: 0.24, ease: "easeOut" }}
+                >
+                  <AIAgent
+                    contextAnomaly={activeAnomaly}
+                    onClearContext={() => setActiveAnomaly(null)}
+                  />
+                </motion.div>
+              ) : activeTab === "Assets" ? (
+                <motion.div
+                  key="tab-assets"
+                  initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -8, filter: "blur(8px)" }}
+                  transition={{ duration: 0.24, ease: "easeOut" }}
+                >
+                  <AssetsView
+                    onInvestigateAsset={(asset) => {
+                      setActiveAnomaly({
+                        id: asset.id,
+                        title: `Asset: ${asset.name}`,
+                        severity: asset.health === "Healthy" ? "Info" : asset.health === "Degraded" ? "Warning" : "Critical",
+                        asset: asset.id,
+                        status: "Open",
+                        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                      });
+                      setActiveTab("AI Assistant");
+                    }}
+                  />
+                </motion.div>
+              ) : activeTab === "Anomalies" ? (
+                <motion.div
+                  key="tab-anomalies"
+                  initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -8, filter: "blur(8px)" }}
+                  transition={{ duration: 0.24, ease: "easeOut" }}
+                >
+                  <AnomaliesView
+                    onInvestigate={(anomaly) => {
+                      setActiveAnomaly(anomaly);
+                      setActiveTab("AI Assistant");
+                    }}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={`tab-${activeTab.toLowerCase().replace(/\s+/g, "-")}`}
+                  initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -8, filter: "blur(8px)" }}
+                  transition={{ duration: 0.24, ease: "easeOut" }}
+                >
+                  <>
+            <section className="space-y-4 js-animate-card">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-4xl font-semibold tracking-tight">{activeTab}</h1>
+                <h1 className="js-overview-title text-4xl font-semibold tracking-tight">{activeTab}</h1>
               </div>
 
-              <article className="rounded-xl border border-grid-border bg-grid-surface p-4">
+              <article className="js-animate-card rounded-xl border border-grid-border bg-grid-surface p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-2xl font-semibold">Live Incident Feed</h2>
                   <span className="inline-flex items-center gap-1 text-xs text-grid-muted">
@@ -597,15 +722,17 @@ export default function Dashboard() {
                 </AnimatedList>
               </article>
 
-              <OverviewChart
-                points={chartPoints}
-                loading={chartLoading}
-                error={chartError}
-                onRefresh={fetchChartData}
-                lastUpdated={chartLastUpdated}
-              />
+              <div className="js-overview-chart">
+                <OverviewChart
+                  points={chartPoints}
+                  loading={chartLoading}
+                  error={chartError}
+                  onRefresh={fetchChartData}
+                  lastUpdated={chartLastUpdated}
+                />
+              </div>
 
-              <BentoGrid className="auto-rows-auto grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <BentoGrid className="js-animate-card auto-rows-auto grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {overviewMetrics.map((metric) => (
                   <article
                     key={metric.label}
@@ -647,7 +774,7 @@ export default function Dashboard() {
               </BentoGrid>
             </section>
 
-            <section className="rounded-xl border border-grid-border bg-grid-surface">
+            <section className="js-animate-card rounded-xl border border-grid-border bg-grid-surface">
               <div className="border-b border-grid-border px-4 py-3">
                 <h2 className="text-2xl font-semibold tracking-tight">Anomalies</h2>
                 <p className="text-xs text-grid-muted">
@@ -695,8 +822,10 @@ export default function Dashboard() {
                 </table>
               </div>
             </section>
-              </>
-            )}
+                  </>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </main>
         </div>
       </div>
