@@ -1,5 +1,5 @@
 "use client";
-import Dashboard from "@/components/Dashboard";
+import Dashboard from "../../components/dashboard.jsx";
 import { Confetti } from "../../components/ui/confetti";
 export default function DashboardPage() {
   return (
