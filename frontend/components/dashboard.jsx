@@ -7,6 +7,7 @@ import AnomaliesView from "./AnomaliesView";
 import LiveMonitoringView from "./LiveMonitoringView";
 import OverviewView from "./OverviewView";
 import { AnimatePresence, motion } from "motion/react";
+import { signOut } from "next-auth/react";
 import {
   Activity,
   Bot,
@@ -17,6 +18,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   X,
+  LogOut,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -207,6 +209,18 @@ export default function Dashboard() {
                 <span className="size-1.5 rounded-full bg-grid-success" />
                 Platform Status: Stable | 99.3% pipeline uptime
               </span>
+              
+              <div className="ml-auto flex items-center">
+                <Button
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  variant="ghost"
+                  size="sm"
+                  className="text-grid-muted hover:text-grid-title"
+                >
+                  <LogOut className="mr-2 size-4" />
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </header>
 

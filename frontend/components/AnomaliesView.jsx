@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence, LayoutGroup } from "motion/react";
 
-// Dummy data mirroring the dashboard table, but enriched
+// Dummy data 
 const initialAnomalies = [
   {
     id: "INC-1842",
@@ -81,7 +81,6 @@ export default function AnomaliesView({ onInvestigate }) {
   const [activeFilter, setActiveFilter] = useState("All");
 
   useEffect(() => {
-    // Simulate fetching enriched anomalies from backend
     const timer = setTimeout(() => {
       setAnomalies(initialAnomalies);
       setLoading(false);
