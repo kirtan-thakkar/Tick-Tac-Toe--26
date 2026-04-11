@@ -184,7 +184,7 @@ function TopNav() {
             </nav>
 
             <Button asChild size="sm" className="bg-grid-title text-grid-surface hover:opacity-90 rounded-lg px-5 shadow-sm">
-                <Link href="/signup">Sign Up</Link>
+                <Link href="/login">Sign In</Link>
             </Button>
         </header>
     );

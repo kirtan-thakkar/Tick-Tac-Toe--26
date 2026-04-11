@@ -1,5 +1,11 @@
+"use client";
 import Dashboard from "@/components/Dashboard";
-
+import { Confetti } from "../../components/ui/confetti";
 export default function DashboardPage() {
-  return <Dashboard />;
+  return (
+    <>
+    <Confetti className="absolute inset-0 z-50 pointer-events-none w-full h-full" options={{ spread: 360, ticks: 60, gravity: 0.5, decay: 0.9 }} />
+      <Dashboard />;
+    </>
+  );
 }
