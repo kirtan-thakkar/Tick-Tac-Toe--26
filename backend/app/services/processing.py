@@ -63,11 +63,11 @@ def window_to_df(window_data):
     return df
 
 
-if __name__ == "__main__":
-    # Point this to your actual CSV file location
+# if __name__ == "__main__":
+#     # Point this to your actual CSV file location
     
-    data = get_last_window(360000)
-    csvv = window_to_df(data)
+#     data = get_last_window(360000)
+#     csvv = window_to_df(data)
 
-    print(len(csvv))
-    print(csvv)
+#     print(len(csvv))
+#     print(csvv)
