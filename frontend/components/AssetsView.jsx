@@ -21,8 +21,8 @@ import { motion, AnimatePresence, LayoutGroup } from "motion/react";
 function HealthBadge({ health }) {
   if (health === "Critical") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-grid-danger/15 px-2 py-1 text-xs font-semibold text-grid-danger border border-grid-danger/20">
-        <ServerCrash className="size-3" />
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-grid-danger/15 px-2.5 py-1 text-xs font-semibold text-grid-danger border border-grid-danger/20">
+        <ServerCrash className="size-3.5" />
         {health}
       </span>
     );
@@ -30,16 +30,16 @@ function HealthBadge({ health }) {
 
   if (health === "Degraded" || health === "Warning") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-grid-warning/15 px-2 py-1 text-xs font-semibold text-grid-warning border border-grid-warning/20">
-        <AlertTriangle className="size-3" />
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-grid-warning/15 px-2.5 py-1 text-xs font-semibold text-grid-warning border border-grid-warning/20">
+        <AlertTriangle className="size-3.5" />
         {health}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-grid-success/15 px-2 py-1 text-xs font-semibold text-grid-success border border-grid-success/20">
-      <CheckCircle2 className="size-3" />
+    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-grid-success/15 px-2.5 py-1 text-xs font-semibold text-grid-success border border-grid-success/20">
+      <CheckCircle2 className="size-3.5" />
       Healthy
     </span>
   );
