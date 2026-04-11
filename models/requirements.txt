@@ -1,0 +1,12 @@
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+joblib
+influxdb-client
+redis
+fastapi
+uvicorn
+tensorflow==2.15.0
+keras
