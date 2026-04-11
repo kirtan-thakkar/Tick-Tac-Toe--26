@@ -1,0 +1,27 @@
+{
+  "timestamp": 1712841402,
+  "ensemble_score": 0.28,
+  "confidence": 0.33,
+  "severity": "low",
+  "anomaly_type": "point",
+  "affected_sensors": [
+    "sensor_3"
+  ],
+  "model_outputs": {
+    "zscore": {
+      "score": 5.841399765425304,
+      "is_anomaly": 1
+    },
+    "iforest": {
+      "score": -0.20857032687351484,
+      "is_anomaly": 0
+    },
+    "lstm": {
+      "score": 0.24414272523547223,
+      "is_anomaly": 0
+    }
+  },
+  "zscore lstm": 55,
+  "lstm if": 4,
+  "if zscore": 60
+}
