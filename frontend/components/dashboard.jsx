@@ -62,20 +62,23 @@ export default function Dashboard() {
       <div className="mx-auto flex min-h-screen max-w-[1600px]">
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-40 w-72 border-r border-grid-border bg-grid-surface px-4 py-5 transition-transform duration-300",
+            "fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-grid-border bg-grid-surface transition-transform duration-300",
             "lg:translate-x-0",
             isSidebarOpen ? "translate-x-0" : "-translate-x-full",
           )}
           aria-label="Primary navigation"
         >
-          <div className="mb-5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex size-9 items-center justify-center rounded-full border border-grid-border bg-grid-page">
-                <ShieldCheck className="size-4" />
+          {/* Header Area */}
+          <div className="flex items-center justify-between border-b border-grid-border px-5 py-5">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 items-center justify-center rounded-lg border border-grid-border bg-grid-page/50 text-emerald-500 shadow-sm">
+                <ShieldCheck className="size-5" />
               </div>
-              <p className="text-xl font-bold tracking-tight">SENTINELIQ</p>
+              <div className="flex flex-col">
+                <span className="text-base font-bold tracking-tight text-grid-title">SENTINEL</span>
+                <span className="text-[0.65rem] font-medium tracking-widest text-grid-muted uppercase">Intelligence</span>
+              </div>
             </div>
-
             <Button
               type="button"
               variant="ghost"
@@ -88,52 +91,76 @@ export default function Dashboard() {
             </Button>
           </div>
 
-          <section className="space-y-2">
-            <p className="px-3 text-[0.68rem] font-semibold tracking-[0.13em] text-grid-muted uppercase">
-              Essential Navigation
-            </p>
+          {/* Navigation Area */}
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            <nav className="space-y-6">
+              <div>
+                <p className="mb-3 px-2 text-xs font-semibold tracking-wider text-grid-muted uppercase">
+                  Platform
+                </p>
+                <div className="space-y-1">
+                  {essentialTabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = tab.label === activeTab;
 
-            {essentialTabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = tab.label === activeTab;
+                    return (
+                      <button
+                        key={tab.label}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(tab.label);
+                          setSidebarOpen(false);
+                        }}
+                        className={cn(
+                          "group flex w-full flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition-all",
+                          isActive
+                            ? "bg-grid-elevated ring-1 ring-grid-border shadow-sm"
+                            : "hover:bg-grid-page/50"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "flex size-7 items-center justify-center rounded-md transition-colors",
+                            isActive ? "bg-grid-page text-grid-title shadow-sm border border-grid-border" : "text-grid-muted group-hover:text-grid-title"
+                          )}>
+                            <Icon className="size-4" />
+                          </div>
+                          <span className={cn(
+                            "text-sm font-medium transition-colors",
+                            isActive ? "text-grid-title" : "text-grid-muted group-hover:text-grid-title"
+                          )}>
+                            {tab.label}
+                          </span>
+                        </div>
+                        <p className="pl-10 text-[0.7rem] leading-relaxed text-grid-muted line-clamp-2">
+                          {tab.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </nav>
+          </div>
 
-              return (
-                <Button
-                  key={tab.label}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-auto w-full flex-col items-start gap-1 px-3 py-2.5",
-                    "hover:bg-grid-elevated",
-                    isActive && "bg-grid-elevated",
-                  )}
-                  onClick={() => {
-                    setActiveTab(tab.label);
-                    setSidebarOpen(false);
-                  }}
-                >
-                  <motion.span
-                    className="inline-flex items-center gap-2"
-                    whileHover={{ x: 1.5 }}
-                    transition={{ duration: 0.18, ease: "easeOut" }}
-                  >
-                    <motion.span whileHover={{ rotate: -7, scale: 1.06 }} transition={{ duration: 0.2 }}>
-                      <Icon className="size-3.5 text-grid-muted" />
-                    </motion.span>
-                    <span className="text-[0.83rem] font-semibold text-grid-title">{tab.label}</span>
-                  </motion.span>
-                  <span className="pl-5 text-left text-[0.68rem] leading-snug text-grid-muted">
-                    {tab.description}
-                  </span>
-                </Button>
-              );
-            })}
-          </section>
-
-          <div className="mt-6 border-t border-grid-border pt-3 text-xs text-grid-muted">
-            <p>SentinelIQ v1.0</p>
-            <p>Region: EU-Region-2</p>
+          {/* Footer Area */}
+          <div className="mt-auto border-t border-grid-border bg-grid-page/30 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-grid-border bg-grid-surface p-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="relative flex size-2.5 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75"></span>
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-grid-title">All Systems Operational</span>
+                  <span className="text-[0.65rem] text-grid-muted">Updated just now</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between px-1 text-[0.65rem] text-grid-muted">
+              <span>SentinelIQ v1.2.0</span>
+              <span>EU-Central</span>
+            </div>
           </div>
         </aside>
 
