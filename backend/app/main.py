@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api.routes import signals, anomalies
+from app.api.routes import signals, anomalies, feedback
 import threading
 from fastapi import FastAPI
 from app.workers.worker import start_analysis_worker
@@ -10,6 +10,7 @@ app = FastAPI(title="SentinelIQ API")
 # include routes
 app.include_router(signals.router, prefix="/signals", tags=["Signals"])
 app.include_router(anomalies.router, prefix="/anomalies", tags=["Anomalies"])
+app.include_router(feedback.router, prefix="/feedback", tags=["Feedback"])
 
 
 @app.get("/")
