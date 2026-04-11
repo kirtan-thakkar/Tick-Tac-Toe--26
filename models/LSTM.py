@@ -145,8 +145,8 @@ print("\nSaving model assets...")
 output_dir = Path("Trained Models")
 output_dir.mkdir(parents=True, exist_ok=True)
 # A. Save the Neural Network
-model.save(output_dir / "lstm_autoencoder.keras")
-print(f"[+] Model saved as: {output_dir / 'lstm_autoencoder.keras'}")
+joblib.dump(model, output_dir / "lstm_autoencoder.joblib")
+print(f"[+] Model saved as: {output_dir / 'lstm_autoencoder.joblib'}")
 
 # B. Save the Scaler
 joblib.dump(scaler, output_dir / "lstm_scaler.joblib")
