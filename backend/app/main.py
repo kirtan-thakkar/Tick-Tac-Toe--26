@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from app.api.routes import signals, anomalies
+import threading
+from fastapi import FastAPI
+from app.workers.worker import start_analysis_worker
 
 
 app = FastAPI(title="SentinelIQ API")
@@ -12,3 +15,9 @@ app.include_router(anomalies.router, prefix="/anomalies", tags=["Anomalies"])
 @app.get("/")
 def root():
     return {"message": "SentinelIQ Backend Running 🚀"}
+
+@app.on_event("startup")
+async def startup_event():
+    # Start the worker in a background thread
+    daemon_thread = threading.Thread(target=start_analysis_worker, daemon=True)
+    daemon_thread.start()
