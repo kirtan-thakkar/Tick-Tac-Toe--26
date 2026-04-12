@@ -69,7 +69,10 @@ def load_lstm_model(model_path: Path):
             return load_model(model_path, compile=False)
         except Exception as e2:
             print(f"Secondary fallback failed: {e2}. Trying manual rebuild...")
-            # If all else fails, we could try more complex logic, but let's stick to what works.
+            # If all else fails, the model might be very broken or incompatible.
+            # In a real scenario, we might want to use a more complex rebuild logic,
+            # but let's try one more thing: loading just the weights if possible.
+            # However, for now, let's try to use the most successful one from detection.py
             raise e2
 
 
@@ -81,7 +84,7 @@ lstm_thresh = joblib.load(MODELS_DIR / "msl_lstm_threshold.joblib")
 def run_detection(df: pd.DataFrame):
     """
     Runs Z-Score, Isolation Forest, and LSTM models on the 60s window.
-    Returns the exact JSON format required for the frontend.
+    Returns the exact JSON format required for the frontend as shown in detection.py.
     """
     if df is None or len(df) < 60:
         return {"is_anomaly": False, "message": "Window too small"}
@@ -137,6 +140,7 @@ def run_detection(df: pd.DataFrame):
     if_scores_full = -if_model.decision_function(if_scaled_full)
     
     # Calculate LSTM MAE per timestep for the full window
+    # We need to calculate MAE per timestep. X_pred and X_seq are (1, 60, N_FEATURES)
     mae_loss_per_step = np.mean(np.abs(X_pred[0] - X_seq[0]), axis=1) # Shape: (60,)
 
     scores = {
