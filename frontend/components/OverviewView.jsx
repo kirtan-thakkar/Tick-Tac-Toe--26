@@ -65,6 +65,12 @@ const initialLiveFeedItems = [
   },
 ];
 
+const defaultCorrelations = {
+  zscore_lstm_corr: 0,
+  lstm_if_corr: 0,
+  if_zscore_corr: 0,
+};
+
 const anomaliesTableRows = [
   {
     id: "INC-1842",
@@ -108,6 +114,32 @@ function computeTrend(current, previous, isPercentage = false) {
 function parseMetricValue(metrics, label) {
   const raw = metrics.find((metric) => metric.label === label)?.value ?? "0";
   return Number.parseFloat(String(raw).replace("%", "")) || 0;
+}
+
+function clampCorr(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  return Math.max(-1, Math.min(1, num));
+}
+
+function buildCorrelationRows(correlations) {
+  const zL = clampCorr(correlations?.zscore_lstm_corr);
+  const lI = clampCorr(correlations?.lstm_if_corr);
+  const iZ = clampCorr(correlations?.if_zscore_corr);
+
+  return [
+    { label: "Z-Score", values: [1, zL, iZ] },
+    { label: "LSTM", values: [zL, 1, lI] },
+    { label: "Isolation Forest", values: [iZ, lI, 1] },
+  ];
+}
+
+function corrCellClass(value) {
+  if (value >= 0.75) return "bg-grid-success/25 text-grid-success border-grid-success/30";
+  if (value >= 0.3) return "bg-grid-success/10 text-grid-title border-grid-success/20";
+  if (value <= -0.75) return "bg-grid-danger/25 text-grid-danger border-grid-danger/30";
+  if (value <= -0.3) return "bg-grid-danger/10 text-grid-title border-grid-danger/20";
+  return "bg-grid-page/40 text-grid-muted border-grid-border/40";
 }
 
 function buildLiveFeed(modelScores, weightedMean, metrics) {
@@ -197,6 +229,7 @@ export default function OverviewView({ onInvestigate }) {
   const [metricsLoading, setMetricsLoading] = useState(true);
   const previousMetricsRef = useRef();
   const [liveFeedItems, setLiveFeedItems] = useState(initialLiveFeedItems);
+  const [correlations, setCorrelations] = useState(defaultCorrelations);
 
   // Simulated Model Scores for Anomaly Detection
   const [modelScores, setModelScores] = useState({
@@ -225,6 +258,11 @@ export default function OverviewView({ onInvestigate }) {
           info: Number(data.info || 0),
           systemHealthPercent: Number(data.systemHealthPercent || 0),
         };
+        setCorrelations({
+          zscore_lstm_corr: Number(data?.correlations?.zscore_lstm_corr ?? 0),
+          lstm_if_corr: Number(data?.correlations?.lstm_if_corr ?? 0),
+          if_zscore_corr: Number(data?.correlations?.if_zscore_corr ?? 0),
+        });
         const previous = previousMetricsRef.current;
         const totalTrend = computeTrend(totals.totalActiveAnomalies, previous?.totalActiveAnomalies);
         const criticalTrend = computeTrend(totals.critical, previous?.critical);
@@ -314,6 +352,8 @@ export default function OverviewView({ onInvestigate }) {
   const primaryCards = primaryCardLabels
     .map((label) => overviewMetrics.find((metric) => metric.label === label))
     .filter(Boolean);
+  const correlationRows = buildCorrelationRows(correlations);
+  const correlationHeaders = ["Z-Score", "LSTM", "Isolation Forest"];
 
   useEffect(() => {
     setLiveFeedItems(buildLiveFeed(modelScores, weightedMean, overviewMetrics));
@@ -529,6 +569,56 @@ export default function OverviewView({ onInvestigate }) {
               <p>System health: <span className="font-mono text-grid-title">{healthPercent.toFixed(1)}%</span></p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 5. Correlation Matrix */}
+      <div className="bg-grid-surface/20 border border-grid-border/40 rounded-xl p-5 ring-1 ring-grid-border/30">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold tracking-tight flex items-center gap-2">
+            <Brain className="size-4 text-grid-muted" />
+            Model Correlation Matrix
+          </h3>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-grid-muted">
+            Source: Redis / anomaly:latest
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-separate border-spacing-2">
+            <thead>
+              <tr>
+                <th className="text-left px-2 py-1 text-grid-muted uppercase tracking-wider font-semibold">Model</th>
+                {correlationHeaders.map((header) => (
+                  <th
+                    key={header}
+                    className="px-2 py-1 text-grid-muted uppercase tracking-wider font-semibold text-center"
+                  >
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {correlationRows.map((row) => (
+                <tr key={row.label}>
+                  <th className="text-left px-2 py-2 text-grid-title font-semibold whitespace-nowrap">{row.label}</th>
+                  {row.values.map((value, idx) => (
+                    <td key={`${row.label}-${idx}`}>
+                      <div
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-center font-mono font-medium",
+                          corrCellClass(value)
+                        )}
+                      >
+                        {value.toFixed(2)}
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

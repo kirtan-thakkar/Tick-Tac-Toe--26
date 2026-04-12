@@ -108,6 +108,38 @@ def get_renewable_mix() -> dict:
     }
 
 
+def get_latest_correlations() -> dict:
+    """
+    Read latest model correlation values from Redis anomaly payload.
+
+    Returns a stable structure for frontend matrix rendering:
+    {
+        "zscore_lstm_corr": float,
+        "lstm_if_corr": float,
+        "if_zscore_corr": float
+    }
+    """
+    default_corr = {
+        "zscore_lstm_corr": 0.0,
+        "lstm_if_corr": 0.0,
+        "if_zscore_corr": 0.0,
+    }
+
+    try:
+        latest_anomaly = redis_get("anomaly:latest")
+        if not latest_anomaly:
+            return default_corr
+
+        anomaly = json.loads(latest_anomaly)
+        return {
+            "zscore_lstm_corr": float(anomaly.get("zscore_lstm_corr", 0.0)),
+            "lstm_if_corr": float(anomaly.get("lstm_if_corr", 0.0)),
+            "if_zscore_corr": float(anomaly.get("if_zscore_corr", 0.0)),
+        }
+    except Exception:
+        return default_corr
+
+
 @router.get("/overview/metrics")
 async def get_overview_metrics():
     """
@@ -145,6 +177,9 @@ async def get_overview_metrics():
     # Get renewable mix
     renewable_mix = get_renewable_mix()
     renewables_share = sum(renewable_mix.values())
+
+    # Read latest pair-wise model correlations from Redis anomaly payload
+    correlation_values = get_latest_correlations()
     
     return {
         "totalActiveAnomalies": total_active,
@@ -154,4 +189,5 @@ async def get_overview_metrics():
         "systemHealthPercent": round(system_health, 1),
         "renewablesSharePercent": renewables_share,
         "renewablesSplit": renewable_mix,
+        "correlations": correlation_values,
     }

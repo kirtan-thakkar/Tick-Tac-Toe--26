@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import time
 import os
 from app.core.influx import write_api
@@ -18,7 +19,11 @@ def stream_csv_to_influx(file_path: str):
         print(f" Error: File {file_path} not found!")
         return
 
-    df = pd.read_csv(file_path)
+    data = np.load(file_path)
+
+    # Convert to DataFrame
+    df = pd.DataFrame(data)
+    df.columns = [f"sensor_{i}" for i in range(df.shape[1])]
     
     # --- 1. PRE-FILTER COLUMNS (Optimization for 50+ sensors) ---
     # We identify which columns are actually sensors ONCE at the start.
@@ -64,5 +69,5 @@ def stream_csv_to_influx(file_path: str):
 # This block allows you to run this file by itself in a separate terminal
 if __name__ == "__main__":
     # Point this to your actual CSV file location
-    CSV_FILE = "app/dataset/smd_test.csv"
+    CSV_FILE = "app/dataset/D-15.npy"
     stream_csv_to_influx(CSV_FILE)

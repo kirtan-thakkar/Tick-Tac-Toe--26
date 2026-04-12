@@ -31,10 +31,30 @@ const SENSORS = [
 
 export default function LiveMonitoringView() {
   const [data, setData] = useState(generateInitialData());
+  const [streamLogs, setStreamLogs] = useState([]);
   const [isLive, setIsLive] = useState(true);
   const [activeSensor, setActiveSensor] = useState(SENSORS[0].id);
   const [activeMetrics, setActiveMetrics] = useState({ point: true, collective: true, contextual: true });
   const [loading, setLoading] = useState(false);
+
+  const fetchSystemLogs = async () => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      let res = await fetch(`${baseUrl}/logs/system?limit=8`, { cache: "no-store" });
+
+      // Backward compatibility when backend mounts logs under /api
+      if (!res.ok) {
+        res = await fetch(`${baseUrl}/api/logs/system?limit=8`, { cache: "no-store" });
+      }
+
+      if (!res.ok) throw new Error("Failed to fetch system logs");
+      const payload = await res.json();
+      const logs = Array.isArray(payload?.logs) ? payload.logs : [];
+      setStreamLogs(logs);
+    } catch (err) {
+      console.error("System logs fetch error:", err);
+    }
+  };
   
   // Fetch real model scores from backend
   const fetchModelScores = async () => {
@@ -98,10 +118,23 @@ export default function LiveMonitoringView() {
     return () => clearInterval(interval);
   }, [isLive, activeSensor]);
 
+  useEffect(() => {
+    fetchSystemLogs();
+    const interval = setInterval(fetchSystemLogs, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const latest = data[data.length - 1];
 
   const toggleMetric = (key) => {
     setActiveMetrics(prev => ({...prev, [key]: !prev[key]}));
+  };
+
+  const formatLogTime = (isoTime) => {
+    if (!isoTime) return "--:--";
+    const d = new Date(isoTime);
+    if (Number.isNaN(d.getTime())) return "--:--";
+    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
   };
 
   // SVG Chart builders
@@ -377,32 +410,29 @@ export default function LiveMonitoringView() {
           <div className="flex-1 overflow-hidden relative min-h-[140px]">
             <div className="absolute inset-0 bg-gradient-to-b from-grid-surface/20 via-transparent to-transparent z-10 h-4 pointer-events-none" />
             <div className="space-y-3 font-mono text-[10px] sm:text-xs">
-              {[
-                { time: 'now', msg: 'Syncing telemetry packet 0x4F', type: 'info' },
-                { time: '-2s', msg: 'Thermal variance noted on TX-AT-022', type: 'warn' },
-                { time: '-5s', msg: 'Frequency normalized at bus 4', type: 'success' },
-                { time: '-12s', msg: 'Re-evaluating predictive model', type: 'info' },
-                { time: '-18s', msg: 'Anomaly flagged: Voltage Sag', type: 'danger' },
-              ].map((log, i) => (
+              {streamLogs.map((log, i) => (
                 <motion.div 
-                  key={i} 
+                  key={`${log.time}-${i}`}
                   initial={{ opacity: 0, x: -5 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.1 }}
                   className="flex gap-3 items-start border-b border-grid-border/20 pb-2 last:border-0"
                 >
-                  <span className="text-grid-muted w-8 shrink-0">{log.time}</span>
+                  <span className="text-grid-muted w-16 shrink-0">{formatLogTime(log.time)}</span>
                   <span className={cn(
                     "flex-1 leading-relaxed",
-                    log.type === 'danger' ? "text-grid-danger" :
-                    log.type === 'warn' ? "text-grid-warning" :
-                    log.type === 'success' ? "text-grid-success" :
+                    log.type === 'error' || log.type === 'anomaly' ? "text-grid-danger" :
+                    log.type === 'inference' ? "text-grid-warning" :
+                    log.type === 'data' ? "text-grid-success" :
                     "text-grid-title/80"
                   )}>
                     {log.msg}
                   </span>
                 </motion.div>
               ))}
+              {streamLogs.length === 0 && (
+                <div className="text-grid-muted">Waiting for backend logs...</div>
+              )}
             </div>
           </div>
         </div>

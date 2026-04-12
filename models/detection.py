@@ -118,7 +118,8 @@ def run_detection(df: pd.DataFrame):
     # --- 4. MODEL 2: ISOLATION FOREST (Point Detection) ---
     if_scaled = if_scaler.transform(latest_row)
     if_pred = if_model.predict(if_scaled) # -1 is anomaly
-    if_score = -if_model.decision_function(if_scaled)[0] # Higher is more anomalous
+    if_raw_score = -if_model.decision_function(if_scaled)[0] # Higher is more anomalous
+    if_score = float(if_raw_score)
     is_if_anomaly = 1 if if_pred[0] == -1 else 0
 
     # --- 5. MODEL 3: LSTM AUTOENCODER (Sequence Detection) ---
@@ -127,6 +128,7 @@ def run_detection(df: pd.DataFrame):
     X_pred = lstm_model.predict(X_seq, verbose=0)
     # Calculate Reconstruction Error (MAE)
     mae_loss = np.mean(np.abs(X_pred - X_seq))
+    lstm_score = float(mae_loss)
     is_lstm_anomaly = 1 if mae_loss > lstm_thresh else 0
 
     # --- 6. CORRELATION CALCULATION (The 3 Keys) ---
@@ -164,8 +166,8 @@ def run_detection(df: pd.DataFrame):
     # Final Ensemble Score (Normalized)
     # Using thresholds for normalization
     z_score_norm = min(max_z / 10.0, 1.0)
-    if_score_norm = min(max_z / 0.5, 1.0) # Heuristic
-    lstm_score_norm = min(mae_loss / lstm_thresh, 1.0)
+    if_score_norm = min(if_score / 0.5, 1.0) # Heuristic
+    lstm_score_norm = lstm_score
     
     ensemble_score = (z_score_norm + if_score_norm + lstm_score_norm) / 3.0
 
@@ -188,7 +190,7 @@ def run_detection(df: pd.DataFrame):
                 "is_anomaly": bool(is_if_anomaly)
             },
             "lstm": {
-                "score": float(mae_loss),
+                "score": float(lstm_score),
                 "is_anomaly": bool(is_lstm_anomaly)
             }
         },
