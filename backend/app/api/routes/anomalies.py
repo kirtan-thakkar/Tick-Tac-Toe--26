@@ -42,6 +42,18 @@ def enrich_anomaly_as_incident(anomaly_data: dict) -> dict:
     Output (for dashboard): { id, title, severity, asset, status, timestamp, hypothesis, duration }
     """
     try:
+        # If payload is already in incident format, keep it with minimal normalization.
+        if "anomaly_score" in anomaly_data and "title" in anomaly_data and "timestamp" in anomaly_data:
+            normalized = dict(anomaly_data)
+            normalized["anomaly_score"] = float(normalized.get("anomaly_score", 0.0))
+            if "anomaly_type" not in normalized:
+                normalized["anomaly_type"] = "none"
+            return normalized
+
+        # Raw detector records should carry ensemble_score; skip malformed entries.
+        if "ensemble_score" not in anomaly_data:
+            return None
+
         ts = anomaly_data.get("timestamp", int(datetime.now().timestamp()))
         severity = anomaly_data.get("severity", "info").lower()
         
@@ -61,7 +73,7 @@ def enrich_anomaly_as_incident(anomaly_data: dict) -> dict:
         
         # Get affected sensors/asset
         affected_sensors = anomaly_data.get("affected_sensors", [])
-        primary_asset = affected_sensors[0] if affected_sensors else "UNKNOWN"
+        primary_asset = anomaly_data.get("asset") or (affected_sensors[0] if affected_sensors else "UNKNOWN")
         
         # Determine anomaly type for title
         anomaly_type = anomaly_data.get("anomaly_type", "collective")
@@ -91,7 +103,8 @@ def enrich_anomaly_as_incident(anomaly_data: dict) -> dict:
             "timestamp": ts,
             "hypothesis": hypothesis,
             "duration": f"{datetime.fromtimestamp(ts).strftime('%H:%M:%S')}",
-            "anomaly_score": float(anomaly_data.get("ensemble_score", 0)),
+            "anomaly_score": float(anomaly_data.get("ensemble_score", anomaly_data.get("anomaly_score", 0))),
+            "anomaly_type": anomaly_type,
         }
     except Exception as e:
         print(f"Error enriching anomaly: {e}")

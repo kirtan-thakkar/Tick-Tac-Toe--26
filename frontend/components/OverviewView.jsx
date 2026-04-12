@@ -71,7 +71,7 @@ const defaultCorrelations = {
   if_zscore_corr: 0,
 };
 
-const anomaliesTableRows = [
+const fallbackPriorityRows = [
   {
     id: "INC-1842",
     title: "Transformer thermal anomaly",
@@ -114,6 +114,17 @@ function computeTrend(current, previous, isPercentage = false) {
 function parseMetricValue(metrics, label) {
   const raw = metrics.find((metric) => metric.label === label)?.value ?? "0";
   return Number.parseFloat(String(raw).replace("%", "")) || 0;
+}
+
+function formatQueueTime(value) {
+  if (typeof value === "number") {
+    return new Date(value * 1000).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }
+  return value || "--:--";
 }
 
 function clampCorr(value) {
@@ -230,6 +241,7 @@ export default function OverviewView({ onInvestigate }) {
   const previousMetricsRef = useRef();
   const [liveFeedItems, setLiveFeedItems] = useState(initialLiveFeedItems);
   const [correlations, setCorrelations] = useState(defaultCorrelations);
+  const [priorityRows, setPriorityRows] = useState(fallbackPriorityRows);
 
   // Simulated Model Scores for Anomaly Detection
   const [modelScores, setModelScores] = useState({
@@ -317,6 +329,45 @@ export default function OverviewView({ onInvestigate }) {
     };
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchPriorityQueue = async () => {
+      try {
+        const baseUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL ||
+          process.env.NEXT_PUBLIC_API_URL ||
+          "http://localhost:8000";
+
+        const res = await fetch(`${baseUrl}/anomalies/list?limit=3&page=1`, {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        const rows = Array.isArray(data?.items)
+          ? data.items.map((item) => ({
+              id: item.id || "INC-UNK",
+              title: item.title || "Anomaly detected",
+              severity: item.severity || "Info",
+              asset: item.asset || "UNKNOWN",
+              status: item.status || "Open",
+              timestamp: item.timestamp,
+              hypothesis: item.hypothesis,
+              anomaly_score: item.anomaly_score,
+              anomaly_type: item.anomaly_type,
+            }))
+          : [];
+
+        setPriorityRows(rows.length > 0 ? rows : fallbackPriorityRows);
+      } catch (err) {
+        console.error("Failed to fetch priority queue:", err);
+      }
+    };
+
+    fetchPriorityQueue();
+    const interval = setInterval(fetchPriorityQueue, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -462,7 +513,7 @@ export default function OverviewView({ onInvestigate }) {
             </div>
 
             <div className="flex-1 flex flex-col gap-3">
-              {anomaliesTableRows.slice(0,3).map((anomaly) => (
+              {priorityRows.slice(0, 3).map((anomaly) => (
                 <div 
                   key={anomaly.id} 
                   className="group relative bg-grid-surface/30 rounded-lg p-3 border border-grid-border/50 hover:border-grid-border transition-colors cursor-pointer"
@@ -471,7 +522,7 @@ export default function OverviewView({ onInvestigate }) {
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <span className="font-mono text-[10px] text-grid-muted">{anomaly.id}</span>
                     <span className="text-[10px] text-grid-muted flex items-center gap-1">
-                      <Clock3 className="size-3" /> {anomaly.timestamp}
+                      <Clock3 className="size-3" /> {formatQueueTime(anomaly.timestamp)}
                     </span>
                   </div>
                   <p className="text-sm font-medium text-grid-title leading-tight mb-2 group-hover:text-grid-title/80 transition-colors">
