@@ -1,42 +1,38 @@
 {
   "timestamp": 1712840457,
-  "ensemble_score": 0.3665,
+  "ensemble_score": 0.37,
   "confidence": 0.33,
   "severity": "low",
   "anomaly_type": "point",
   "affected_sensors": [
-    "sensor_9",
-    "sensor_19",
     "sensor_1",
-    "sensor_3"
+    "sensor_3",
+    "sensor_19"
   ],
+  "detection_driver": "zscore",
   "model_outputs": {
     "zscore": {
-      "score": 8.3213,
-      "score_norm": 0.0394,
-      "is_anomaly": 1
+      "score": 8.321292113549845,
+      "is_anomaly": 1,
+      "score_norm": 0.039446180625802615
     },
     "iforest": {
-      "score": -0.0096,
-      "score_norm": 0.7994,
-      "is_anomaly": 0
+      "score": -0.004888673993000858,
+      "is_anomaly": 0,
+      "score_norm": 0.7944522860163039
     },
     "lstm": {
-      "score": 0.646385,
-      "score_norm": 0.3137,
-      "rolling_zscore": 1.014,
-      "is_anomaly": 0
+      "score": 0.12058962483709779,
+      "is_anomaly": 0,
+      "score_norm": 0.2615479162666802
     }
   },
   "consensus": {
-    "type": "solo",
     "votes": 1,
-    "solo_detector": "zscore",
     "agreement": {
-      "zscore_lstm": 0,
+      "zscore_lstm": 82,
       "lstm_iforest": 1,
-      "zscore_iforest": 0
+      "zscore_iforest": 83
     }
-  },
-  "detection_driver": "iforest"
+  }
 }

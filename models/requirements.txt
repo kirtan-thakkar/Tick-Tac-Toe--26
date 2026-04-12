@@ -8,5 +8,5 @@ influxdb-client
 redis
 fastapi
 uvicorn
-tensorflow==2.15.0
+tensorflow
 keras

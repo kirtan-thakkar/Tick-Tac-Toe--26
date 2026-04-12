@@ -110,6 +110,9 @@ lstm_scores_norm = norm_score(lstm_scores_full)
 
 # 7. GENERATE JSON
 output_dir = base_dir / "anomalies_output"
+if output_dir.exists():
+    import shutil
+    shutil.rmtree(output_dir)
 output_dir.mkdir(exist_ok=True)
 
 base_timestamp = 1712839200
@@ -194,8 +197,8 @@ print(f"Saved Isolation Forest to {models_dir / 'msl_isolation_forest_model.jobl
 joblib.dump(scaler_lstm, models_dir / "msl_lstm_scaler.joblib")
 joblib.dump(lstm_threshold, models_dir / "msl_lstm_threshold.joblib")
 
-# Save LSTM Autoencoder as Joblib
-joblib.dump(lstm_model, models_dir / "msl_lstm_autoencoder.joblib")
+# Save LSTM Autoencoder as .keras file
+lstm_model.save(models_dir / "msl_lstm_autoencoder.keras")
 print(f"Saved LSTM Autoencoder assets to {models_dir}")
 print("All models successfully stored.")
 

@@ -7,21 +7,30 @@
   "affected_sensors": [
     "sensor_11"
   ],
+  "detection_driver": "zscore",
   "model_outputs": {
     "zscore": {
       "score": 26.814175355583405,
-      "is_anomaly": 1
+      "is_anomaly": 1,
+      "score_norm": 0.13216739075060058
     },
     "iforest": {
       "score": -0.2211169664877765,
-      "is_anomaly": 0
+      "is_anomaly": 0,
+      "score_norm": 0.2743679646086676
     },
     "lstm": {
-      "score": 0.19005191999985857,
-      "is_anomaly": 0
+      "score": 0.1891205552765999,
+      "is_anomaly": 0,
+      "score_norm": 0.41018526446709086
     }
   },
-  "zscore lstm": 266,
-  "lstm if": 4,
-  "if zscore": 270
+  "consensus": {
+    "votes": 1,
+    "agreement": {
+      "zscore_lstm": 266,
+      "lstm_iforest": 4,
+      "zscore_iforest": 270
+    }
+  }
 }

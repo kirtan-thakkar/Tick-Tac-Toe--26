@@ -4,10 +4,18 @@ import os
 from app.core.influx import write_api
 from app.core.config import settings
 
+# import sys
+# import os
+
+# # Adds the 'backend' directory to the search path
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+from app.core.influx import write_api
+
 def stream_csv_to_influx(file_path: str):
     # Load the data
     if not os.path.exists(file_path):
-        print(f"❌ Error: File {file_path} not found!")
+        print(f" Error: File {file_path} not found!")
         return
 
     df = pd.read_csv(file_path)

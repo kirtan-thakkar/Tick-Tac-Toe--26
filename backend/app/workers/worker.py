@@ -1,14 +1,31 @@
+import sys
+import os
+from pathlib import Path
+
+# This finds the 'backend' folder and then goes one level up to the PROJECT ROOT
+base_path = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.append(str(base_path))
+
+# Now try the imports
+try:
+    from models.detection import run_detection
+    print("Successfully imported models.detection!")
+except ImportError as e:
+    print(f"STILL FAILING. Looking in: {base_path}")
+    print(f"Current sys.path: {sys.path}")
+    raise e
+
+# Your other imports
 import time
 import json
 from app.services.processing import get_last_window, window_to_df
-from app.services.detection import run_detection
 from app.core.redis import redis_set, redis_client
 
 def start_analysis_worker():
     print("Analysis Worker is running...")
 
     while True:
-        print("Pipeline result:", result)
+        # print("Pipeline result:", result)
 
         time.sleep(5)
 

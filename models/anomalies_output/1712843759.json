@@ -8,21 +8,30 @@
     "sensor_1",
     "sensor_3"
   ],
+  "detection_driver": "zscore",
   "model_outputs": {
     "zscore": {
       "score": 5.841399765425304,
-      "is_anomaly": 1
+      "is_anomaly": 1,
+      "score_norm": 0.027012282866977575
     },
     "iforest": {
       "score": -0.04376885533263131,
-      "is_anomaly": 0
+      "is_anomaly": 0,
+      "score_norm": 0.7009355103209305
     },
     "lstm": {
-      "score": 0.27021864682501895,
-      "is_anomaly": 0
+      "score": 0.26528520254794596,
+      "is_anomaly": 0,
+      "score_norm": 0.575379449405619
     }
   },
-  "zscore lstm": 55,
-  "lstm if": 3,
-  "if zscore": 58
+  "consensus": {
+    "votes": 1,
+    "agreement": {
+      "zscore_lstm": 55,
+      "lstm_iforest": 3,
+      "zscore_iforest": 58
+    }
+  }
 }

@@ -10,21 +10,30 @@
     "sensor_21",
     "sensor_22"
   ],
+  "detection_driver": "iforest",
   "model_outputs": {
     "zscore": {
       "score": 10.279429296739442,
-      "is_anomaly": 1
+      "is_anomaly": 1,
+      "score_norm": 0.049264057418698944
     },
     "iforest": {
       "score": 0.052309938619765406,
-      "is_anomaly": 1
+      "is_anomaly": 1,
+      "score_norm": 0.9320295719623027
     },
     "lstm": {
-      "score": 0.17486210857956827,
-      "is_anomaly": 0
+      "score": 0.1768269120215755,
+      "is_anomaly": 0,
+      "score_norm": 0.3835214716157477
     }
   },
-  "zscore lstm": 101,
-  "lstm if": 1,
-  "if zscore": 102
+  "consensus": {
+    "votes": 2,
+    "agreement": {
+      "zscore_lstm": 101,
+      "lstm_iforest": 1,
+      "zscore_iforest": 102
+    }
+  }
 }
