@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import {
-  Activity,
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   CheckCircle2,
   Clock3,
-  RefreshCw,
   Wind,
   Sun,
   Zap,
@@ -125,52 +123,17 @@ const anomaliesTableRows = [
   },
 ];
 
-const fallbackChartPoints = [
-  { label: "08:40", value: 42 },
-  { label: "08:45", value: 48 },
-  { label: "08:50", value: 45 },
-  { label: "08:55", value: 57 },
-  { label: "09:00", value: 63 },
-  { label: "09:05", value: 59 },
-  { label: "09:10", value: 68 },
-  { label: "09:15", value: 65 },
-];
-
 // --- UTILS ---
-function normalizeChartPayload(payload) {
-  const sourcePoints = payload?.points ?? payload?.data ?? payload?.series ?? payload?.chart ?? [];
-  if (!Array.isArray(sourcePoints) || sourcePoints.length === 0) return fallbackChartPoints;
-  const normalized = sourcePoints
-    .map((point, index) => {
-      const label = point?.label ?? point?.time ?? point?.timestamp ?? point?.x ?? String(index + 1);
-      const rawValue = point?.value ?? point?.y ?? point?.count ?? 0;
-      const value = Number(rawValue);
-      if (Number.isNaN(value)) return null;
-      return { label: String(label), value };
-    })
-    .filter(Boolean);
-  return normalized.length > 1 ? normalized : fallbackChartPoints;
-}
+function computeTrend(current, previous, isPercentage = false) {
+  if (typeof previous !== "number") return { trend: "flat", delta: null };
 
-function buildLinePath(points) {
-  const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(max - min, 1);
+  const diff = current - previous;
+  if (diff === 0) return { trend: "flat", delta: "0" };
 
-  return points
-    .map((point, index) => {
-      const x = (index / (points.length - 1)) * 100;
-      const y = 100 - ((point.value - min) / range) * 100;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
-}
-
-function buildAreaPath(points) {
-  const line = buildLinePath(points);
-  if (!line) return "";
-  return `${line} L100,100 L0,100 Z`;
+  return {
+    trend: diff > 0 ? "up" : "down",
+    delta: `${diff > 0 ? "+" : ""}${isPercentage ? diff.toFixed(1) : Math.round(diff)}${isPercentage ? "%" : ""}`,
+  };
 }
 
 function Trend({ trend, delta }) {
@@ -218,113 +181,10 @@ function StatusBadge({ status }) {
   return <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", palette[status])}>{status}</span>;
 }
 
-// --- COMPONENTS ---
-function OverviewChart({ points, loading, error, onRefresh, lastUpdated }) {
-  const chartWidth = 760;
-  const chartHeight = 240;
-  const chartPadding = 24;
-  const path = points.length > 1 ? buildLinePath(points, chartWidth, chartHeight, chartPadding) : "";
-  const areaPath = points.length > 1 ? buildAreaPath(points, chartWidth, chartHeight, chartPadding) : "";
-
-  return (
-    <div className="flex flex-col h-full bg-grid-surface/20 border border-grid-border/40 rounded-xl p-5 ring-1 ring-grid-border/30 relative overflow-hidden">
-      <div className="flex items-start justify-between z-10 mb-4">
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight flex items-center gap-2">
-            <Activity className="size-4 text-grid-muted" />
-            Anomaly Intensity Timeline
-          </h3>
-          <p className="text-xs text-grid-muted mt-1">24h rolled average</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={onRefresh} className="h-7 px-2.5 text-xs text-grid-muted hover:text-grid-title bg-grid-surface/50">
-          <RefreshCw className={cn("size-3 mr-1.5", loading && "animate-spin")} />
-          Refresh
-        </Button>
-      </div>
-
-      <div className="flex-1 relative min-h-[180px] w-full mt-2">
-        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="currentColor" stopOpacity="0.15" className="text-grid-title" />
-              <stop offset="100%" stopColor="currentColor" stopOpacity="0" className="text-grid-title" />
-            </linearGradient>
-          </defs>
-          
-          {/* Grid lines */}
-          {[0.2, 0.4, 0.6, 0.8].map((step) => (
-            <line
-              key={step}
-              x1={chartPadding}
-              y1={chartPadding + (chartHeight - chartPadding * 2) * step}
-              x2={chartWidth - chartPadding}
-              y2={chartPadding + (chartHeight - chartPadding * 2) * step}
-              stroke="currentColor"
-              className="text-grid-border/50"
-              strokeDasharray="4 4"
-            />
-          ))}
-
-          {path && (
-            <g className="text-grid-title">
-              <path d={areaPath} fill="url(#chartGradient)" />
-              <motion.path 
-                d={path} 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2.5" 
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-              />
-              {points.map((point, index) => {
-                const values = points.map((e) => e.value);
-                const min = Math.min(...values);
-                const max = Math.max(...values);
-                const range = Math.max(max - min, 1);
-                const x = chartPadding + (index / (points.length - 1)) * (chartWidth - chartPadding * 2);
-                const y = chartPadding + (1 - (point.value - min) / range) * (chartHeight - chartPadding * 2);
-                return (
-                  <g key={`${point.label}-${index}`}>
-                    <motion.circle 
-                      cx={x} cy={y} r="3.5" 
-                      className="fill-grid-surface stroke-grid-title" 
-                      strokeWidth="1.5"
-                      initial={{ scale: 0, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ delay: 0.8 + (index * 0.05) }}
-                    />
-                    {index % 2 === 0 && (
-                      <text x={x} y={chartHeight - 2} textAnchor="middle" className="fill-grid-muted text-[10px]">
-                        {point.label}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-          )}
-        </svg>
-      </div>
-      
-      <div className="mt-3 flex justify-between text-[10px] text-grid-muted z-10">
-        <span>{loading ? "Syncing data..." : "Up to date"}</span>
-        <div className="flex items-center gap-2">
-          {error && <span className="text-grid-danger">{error}</span>}
-          <span>{lastUpdated}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function OverviewView({ onInvestigate }) {
-  const [chartPoints, setChartPoints] = useState(fallbackChartPoints);
-  const [chartLoading, setChartLoading] = useState(false);
-  const [chartError, setChartError] = useState("");
-  const [chartLastUpdated, setChartLastUpdated] = useState("never");
   const [overviewMetrics, setOverviewMetrics] = useState(initialOverviewMetrics);
   const [metricsLoading, setMetricsLoading] = useState(true);
+  const previousMetricsRef = useRef();
 
   // Simulated Model Scores for Anomaly Detection
   const [modelScores, setModelScores] = useState({
@@ -346,6 +206,19 @@ export default function OverviewView({ onInvestigate }) {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        const totals = {
+          totalActiveAnomalies: Number(data.totalActiveAnomalies || 0),
+          critical: Number(data.critical || 0),
+          warning: Number(data.warning || 0),
+          info: Number(data.info || 0),
+          systemHealthPercent: Number(data.systemHealthPercent || 0),
+        };
+        const previous = previousMetricsRef.current;
+        const totalTrend = computeTrend(totals.totalActiveAnomalies, previous?.totalActiveAnomalies);
+        const criticalTrend = computeTrend(totals.critical, previous?.critical);
+        const warningTrend = computeTrend(totals.warning, previous?.warning);
+        const infoTrend = computeTrend(totals.info, previous?.info);
+        const healthTrend = computeTrend(totals.systemHealthPercent, previous?.systemHealthPercent, true);
         
         // Convert renewablesSplit object to array format
         const renewablesSplitArray = data.renewablesSplit 
@@ -365,34 +238,42 @@ export default function OverviewView({ onInvestigate }) {
         setOverviewMetrics([
           { 
             label: "Total Active Anomalies", 
-            value: String(data.totalActiveAnomalies || 0), 
-            delta: "-3", 
-            trend: "down", 
-            note: "Compared with previous 24h" 
+            value: String(totals.totalActiveAnomalies), 
+            delta: totalTrend.delta,
+            trend: totalTrend.trend,
+            note: "Compared with previous sync" 
           },
           { 
             label: "Critical", 
-            value: String(data.critical || 0), 
-            delta: "+1", 
-            trend: "up", 
+            value: String(totals.critical), 
+            delta: criticalTrend.delta,
+            trend: criticalTrend.trend,
             note: "Requires immediate triage" 
           },
           { 
             label: "Warning", 
-            value: String(data.warning || 0), 
-            delta: "-2", 
-            trend: "down", 
+            value: String(totals.warning), 
+            delta: warningTrend.delta,
+            trend: warningTrend.trend,
             note: "Investigating in progress" 
           },
           { 
             label: "Info", 
-            value: String(data.info || 0), 
-            trend: "flat", 
+            value: String(totals.info), 
+            delta: infoTrend.delta,
+            trend: infoTrend.trend,
             note: "Observed, no action required" 
           },
-          { label: "System Health", value: `${data.systemHealthPercent}%`, delta: "+0.6%", trend: "up", note: "Signal ingestion and model uptime" },
+          {
+            label: "System Health",
+            value: `${totals.systemHealthPercent}%`,
+            delta: healthTrend.delta,
+            trend: healthTrend.trend,
+            note: "Signal ingestion and model uptime",
+          },
           { label: "Renewables Share", value: `${data.renewablesSharePercent}%`, trend: "flat", split: renewablesSplitArray },
         ]);
+        previousMetricsRef.current = totals;
         setMetricsLoading(false);
       } catch (err) {
         console.error("Failed to fetch overview metrics:", err);
@@ -402,38 +283,6 @@ export default function OverviewView({ onInvestigate }) {
     };
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchChartData = async () => {
-    setChartLoading(true);
-    setChartError("");
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:8000";
-
-    try {
-      const response = await fetch(`${baseUrl}/api/charts/chart?hours=24&bucket=15`, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      setChartPoints(normalizeChartPayload(payload));
-      setChartLastUpdated(new Date().toLocaleTimeString());
-    } catch (error) {
-      setChartError(error instanceof Error ? error.message : "Request failed");
-      // Do not use fallback if it crashes, keep previous or fallback points.
-      setChartLastUpdated(new Date().toLocaleTimeString());
-    } finally {
-      setChartLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchChartData();
-    const interval = setInterval(fetchChartData, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -553,21 +402,8 @@ export default function OverviewView({ onInvestigate }) {
         ))}
       </div>
 
-      {/* 3. Main Split Area: Chart & Action Items */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Timeline Chart (Takes 2 columns) */}
-        <div className="lg:col-span-2">
-          <OverviewChart
-            points={chartPoints}
-            loading={chartLoading}
-            error={chartError}
-            onRefresh={fetchChartData}
-            lastUpdated={chartLastUpdated}
-          />
-        </div>
-
-        {/* Priority Action Queue */}
+      {/* 3. Priority Action Queue */}
+      <div className="grid grid-cols-1 gap-6">
         <div className="flex flex-col gap-4">
           <div className="bg-grid-surface/20 border border-grid-border/40 rounded-xl p-5 ring-1 ring-grid-border/30 flex flex-col h-full">
             <div className="flex items-center justify-between mb-4">
