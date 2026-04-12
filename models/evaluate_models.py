@@ -106,14 +106,14 @@ def main():
     # 3. LSTM AUTOENCODER MODEL
     # -----------------------------
     print("\n--- Evaluating LSTM Autoencoder Model ---")
-    lstm_model_path = models_dir / "lstm_autoencoder.joblib"
+    lstm_model_path = models_dir / "lstm_autoencoder.keras"
     lstm_scaler_path = models_dir / "lstm_scaler.joblib"
     lstm_thresh_path = models_dir / "lstm_threshold.joblib"
     
     TIME_STEPS = 60
     
     if lstm_model_path.exists() and lstm_scaler_path.exists() and lstm_thresh_path.exists():
-        lstm_model = joblib.load(lstm_model_path)
+        lstm_model = load_model(lstm_model_path)
         lstm_scaler = joblib.load(lstm_scaler_path)
         lstm_thresh = joblib.load(lstm_thresh_path)
 

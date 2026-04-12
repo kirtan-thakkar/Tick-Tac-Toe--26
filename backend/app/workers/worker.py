@@ -41,7 +41,6 @@ def start_analysis_worker():
             pdData = window_to_df(data)
 
             # 3. DETECT: Run your Z-Score, IForest, and LSTM ensemble
-            # This returns the JSON object you showed me earlier
             result = run_detection(pdData)
 
             if result:
@@ -50,22 +49,24 @@ def start_analysis_worker():
 
                 # --- REDIS STORAGE ---
 
-                # A. Store LATEST result (Overwrites every loop)
+                # A. Store LATEST result (Overwrites every loop) - ALWAYS do this for live graph
                 # Key: 'anomaly:latest'
                 redis_set("anomaly:latest", json_result, expire_seconds=3600)
 
-                # B. Store in HISTORY (Pushes to a list for the sidebar)
-                # Key: 'anomaly:history'
-                # lpush puts it at the top, ltrim keeps only the last 50 entries
-                redis_client.lpush("anomaly:history", json_result)
-                redis_client.ltrim("anomaly:history", 0, 49)
+                # B. Store in HISTORY only if it's a real anomaly
+                if result.get("is_anomaly"):
+                    # Key: 'anomaly:history'
+                    # lpush puts it at the top, ltrim keeps only the last 50 entries
+                    redis_client.lpush("anomaly:history", json_result)
+                    redis_client.ltrim("anomaly:history", 0, 49)
+                    print(f"🚨 Anomaly detected! Severity: {result.get('severity')}")
 
-                # C. Extract specific metric for the Gauges (Optional but helpful)
-                # This makes it easier for the frontend to grab just the 88.4% index
+                # C. Extract specific metric for the Gauges
                 if "ensemble_score" in result:
                     redis_set("analytics:ensemble_score", str(result["ensemble_score"]))
 
-                print(f"📊 Pipeline result processed. Severity: {result.get('severity')}")
+                if not result.get("is_anomaly"):
+                    print(f"📊 Nominal data processed. Ensemble Score: {result.get('ensemble_score')}")
 
         except Exception as e:
             print(f"⚠️ Worker Error: {e}")

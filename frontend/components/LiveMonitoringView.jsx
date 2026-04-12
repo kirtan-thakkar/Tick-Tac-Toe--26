@@ -12,52 +12,91 @@ import {
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 
-// Helper to generate initial chart data
+// Helper to generate initial model score data
 const generateInitialData = (pts = 40) => {
   return Array.from({ length: pts }).map((_, i) => ({
     time: i,
-    freq: 50 + (Math.random() * 0.1 - 0.05),
-    volt: 230 + (Math.random() * 2 - 1),
-    therm: 45 + (Math.random() * 5 - 2.5),
+    point: Math.random() * 0.2,
+    collective: Math.random() * 0.2,
+    contextual: Math.random() * 0.2,
   }));
 };
 
 const SENSORS = [
-  { id: 'node-alpha-1', name: 'Node Alpha-1 (Main Bus)' },
-  { id: 'node-beta-2', name: 'Node Beta-2 (Substation A)' },
-  { id: 'node-gamma-3', name: 'Node Gamma-3 (Feeder 4)' },
-  { id: 'node-delta-4', name: 'Node Delta-4 (Transformer 2)' },
+  { id: 'node-alpha-1', name: 'Main Distribution Bus' },
+  { id: 'node-beta-2', name: 'Primary Substation A' },
+  { id: 'node-gamma-3', name: 'Feeder Line 4 Output' },
+  { id: 'node-delta-4', name: 'Power Transformer Unit 2' },
 ];
 
 export default function LiveMonitoringView() {
   const [data, setData] = useState(generateInitialData());
   const [isLive, setIsLive] = useState(true);
   const [activeSensor, setActiveSensor] = useState(SENSORS[0].id);
-  const [activeMetrics, setActiveMetrics] = useState({ freq: true, volt: true, therm: true });
+  const [activeMetrics, setActiveMetrics] = useState({ point: true, collective: true, contextual: true });
+  const [loading, setLoading] = useState(false);
   
-  // Reset data when sensor changes to simulate loading a new feed
+  // Fetch real model scores from backend
+  const fetchModelScores = async () => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      let res = await fetch(`${baseUrl}/signals/telemetry?sensor=${activeSensor}`, {
+        cache: "no-store"
+      });
+
+      // Backward compatibility if backend is mounted under /api/signals
+      if (!res.ok) {
+        res = await fetch(`${baseUrl}/api/signals/telemetry?sensor=${activeSensor}`, {
+          cache: "no-store"
+        });
+      }
+
+      if (!res.ok) throw new Error("Failed to fetch model scores");
+      const scores = await res.json();
+      
+      // Update data with real model scores from backend mapping:
+      // zscore -> point, isolation_forest -> collective, lstm -> contextual
+      setData(prev => {
+        const last = prev[prev.length - 1];
+        const next = {
+          time: last.time + 1,
+          point: scores.zscore !== undefined ? scores.zscore : Math.random() * 0.2,
+          collective: scores.isolation_forest !== undefined ? scores.isolation_forest : Math.random() * 0.2,
+          contextual: scores.lstm !== undefined ? scores.lstm : Math.random() * 0.2,
+        };
+        return [...prev.slice(1), next];
+      });
+      setLoading(false);
+    } catch (err) {
+      console.error("Model scores fetch error:", err);
+      // Fallback to generated data if backend unavailable
+      setData(prev => {
+        const last = prev[prev.length - 1];
+        const next = {
+          time: last.time + 1,
+          point: Math.random() * 0.2,
+          collective: Math.random() * 0.2,
+          contextual: Math.random() * 0.2,
+        };
+        return [...prev.slice(1), next];
+      });
+    }
+  };
+  
+  // Reset data when sensor changes
   useEffect(() => {
     setData(generateInitialData());
+    setLoading(true);
   }, [activeSensor]);
 
   useEffect(() => {
     if (!isLive) return;
     
-    const interval = setInterval(() => {
-      setData(prev => {
-        const last = prev[prev.length - 1];
-        const next = {
-          time: last.time + 1,
-          freq: 50 + (Math.random() * 0.12 - 0.06),
-          volt: 230 + (Math.random() * 2.5 - 1.25),
-          therm: Math.max(30, Math.min(80, last.therm + (Math.random() * 2 - 1))),
-        };
-        return [...prev.slice(1), next];
-      });
-    }, 1000); // 1 tick per second
+    fetchModelScores();
+    const interval = setInterval(fetchModelScores, 1000); // Fetch from backend every second
     
     return () => clearInterval(interval);
-  }, [isLive]);
+  }, [isLive, activeSensor]);
 
   const latest = data[data.length - 1];
 
@@ -110,7 +149,7 @@ export default function LiveMonitoringView() {
       <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-medium tracking-tight text-grid-title flex items-center gap-3">
-            Live Telemetry
+            Live Anomaly Monitoring
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-grid-success/10 text-grid-success text-xs font-semibold uppercase tracking-wider border border-grid-success/20">
               <span className="relative flex size-2">
                 <span className={cn("absolute inline-flex h-full w-full rounded-full bg-grid-success opacity-75", isLive && "animate-ping")}></span>
@@ -120,90 +159,106 @@ export default function LiveMonitoringView() {
             </span>
           </h1>
           <p className="text-sm text-grid-muted mt-2 max-w-xl leading-relaxed">
-            Real-time multisensor fusion. Monitoring grid stability, thermal load, and voltage harmonics across all active nodes.
+            Real-time inference from ensemble detection models. Monitoring Point, Collective, and Contextual anomalies across all active nodes.
           </p>
         </div>
       </div>
 
       {/* Primary Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Freq */}
-        <div className={cn("bg-grid-surface/30 border rounded-xl p-5 relative overflow-hidden transition-all", activeMetrics.freq ? "border-grid-border/60 ring-1 ring-grid-border/30" : "border-grid-border/20 opacity-40")}>
+        {/* Point Anomaly Card */}
+        <div className={cn("bg-grid-surface/30 border rounded-xl p-5 relative overflow-hidden transition-all", activeMetrics.point ? "border-grid-border/60 ring-1 ring-grid-border/30" : "border-grid-border/20 opacity-40")}>
           <div className="flex items-start justify-between">
             <div className="text-grid-muted flex items-center gap-2">
               <Activity className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wider">Grid Frequency</span>
+              <span className="text-xs font-medium uppercase tracking-wider">Point Anomaly</span>
             </div>
-            <span className={cn("text-xs font-mono", Math.abs(latest.freq - 50) > 0.04 ? "text-grid-warning" : "text-grid-success")}>
-              {latest.freq > 50 ? "↑" : "↓"} {Math.abs(latest.freq - 50).toFixed(3)}
+            <span className={cn("text-xs font-mono", latest.point > 0.3 ? "text-grid-warning" : "text-grid-success")}>
+              {latest.point > 0.3 ? "⚠" : "✓"} {(latest.point * 100).toFixed(1)}%
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <motion.span 
-              key={latest.freq}
+              key={latest.point}
               initial={{ opacity: 0.8, y: -2 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-4xl font-semibold tracking-tight font-mono text-grid-title"
             >
-              {latest.freq.toFixed(3)}
+              {latest.point.toFixed(3)}
             </motion.span>
-            <span className="text-grid-muted font-medium">Hz</span>
+            <span className="text-grid-muted font-medium">Score</span>
           </div>
           <div className="absolute bottom-0 left-0 w-full h-1 bg-grid-surface">
             <motion.div 
-              className={cn("h-full", Math.abs(latest.freq - 50) > 0.04 ? "bg-grid-warning" : "bg-grid-success")}
-              initial={{ width: '50%' }}
-              animate={{ width: `${((latest.freq - 49.9) / 0.2) * 100}%` }}
+              className={cn("h-full", latest.point > 0.3 ? "bg-grid-warning" : "bg-grid-success")}
+              initial={{ width: '0%' }}
+              animate={{ width: `${latest.point * 100}%` }}
               transition={{ type: "tween", duration: 1 }}
             />
           </div>
         </div>
 
-        {/* Voltage */}
-        <div className={cn("bg-grid-surface/30 border rounded-xl p-5 relative overflow-hidden transition-all", activeMetrics.volt ? "border-grid-border/60 ring-1 ring-grid-border/30" : "border-grid-border/20 opacity-40")}>
+        {/* Collective Anomaly Card */}
+        <div className={cn("bg-grid-surface/30 border rounded-xl p-5 relative overflow-hidden transition-all", activeMetrics.collective ? "border-grid-border/60 ring-1 ring-grid-border/30" : "border-grid-border/20 opacity-40")}>
           <div className="flex items-start justify-between">
             <div className="text-grid-muted flex items-center gap-2">
               <Zap className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wider">Feeder Voltage</span>
+              <span className="text-xs font-medium uppercase tracking-wider">Collective Anomaly</span>
             </div>
-            <span className="text-xs font-mono text-grid-muted">
-              Nominal: 230kV
+            <span className={cn("text-xs font-mono", latest.collective > 0.3 ? "text-grid-warning" : "text-grid-success")}>
+              {latest.collective > 0.3 ? "⚠" : "✓"} {(latest.collective * 100).toFixed(1)}%
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <motion.span 
-              key={latest.volt}
+              key={latest.collective}
               initial={{ opacity: 0.8, y: -2 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-4xl font-semibold tracking-tight font-mono text-grid-title"
             >
-              {latest.volt.toFixed(1)}
+              {latest.collective.toFixed(3)}
             </motion.span>
-            <span className="text-grid-muted font-medium">kV</span>
+            <span className="text-grid-muted font-medium">Score</span>
+          </div>
+          <div className="absolute bottom-0 left-0 w-full h-1 bg-grid-surface">
+            <motion.div 
+              className={cn("h-full", latest.collective > 0.3 ? "bg-grid-warning" : "bg-grid-success")}
+              initial={{ width: '0%' }}
+              animate={{ width: `${latest.collective * 100}%` }}
+              transition={{ type: "tween", duration: 1 }}
+            />
           </div>
         </div>
 
-        {/* Thermal */}
-        <div className={cn("bg-grid-surface/30 border rounded-xl p-5 relative overflow-hidden transition-all", activeMetrics.therm ? "border-grid-border/60 ring-1 ring-grid-border/30" : "border-grid-border/20 opacity-40")}>
+        {/* Contextual Anomaly Card */}
+        <div className={cn("bg-grid-surface/30 border rounded-xl p-5 relative overflow-hidden transition-all", activeMetrics.contextual ? "border-grid-border/60 ring-1 ring-grid-border/30" : "border-grid-border/20 opacity-40")}>
           <div className="flex items-start justify-between">
             <div className="text-grid-muted flex items-center gap-2">
               <Thermometer className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wider">Avg Thermal Load</span>
+              <span className="text-xs font-medium uppercase tracking-wider">Contextual Anomaly</span>
             </div>
-            <span className={cn("text-xs font-mono", latest.therm > 65 ? "text-grid-danger" : "text-grid-muted")}>
-              Peak: 85°C
+            <span className={cn("text-xs font-mono", latest.contextual > 0.3 ? "text-grid-danger" : "text-grid-muted")}>
+              {latest.contextual > 0.3 ? "⚠" : "✓"} {(latest.contextual * 100).toFixed(1)}%
             </span>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <motion.span 
-              key={latest.therm}
+              key={latest.contextual}
               initial={{ opacity: 0.8, y: -2 }}
               animate={{ opacity: 1, y: 0 }}
-              className={cn("text-4xl font-semibold tracking-tight font-mono", latest.therm > 65 ? "text-grid-danger" : "text-grid-title")}
+              className={cn("text-4xl font-semibold tracking-tight font-mono", latest.contextual > 0.3 ? "text-grid-danger" : "text-grid-title")}
             >
-              {latest.therm.toFixed(1)}
+              {latest.contextual.toFixed(3)}
             </motion.span>
-            <span className="text-grid-muted font-medium">°C</span>
+            <span className="text-grid-muted font-medium">Score</span>
+          </div>
+          <div className="absolute bottom-0 left-0 w-full h-1 bg-grid-surface">
+            <motion.div 
+              className={cn("h-full", latest.contextual > 0.3 ? "bg-grid-danger" : "bg-grid-success")}
+              initial={{ width: '0%' }}
+              animate={{ width: `${latest.contextual * 100}%` }}
+              transition={{ type: "tween", duration: 1 }}
+            />
           </div>
         </div>
       </div>
@@ -213,25 +268,25 @@ export default function LiveMonitoringView() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex flex-wrap gap-4 text-xs font-medium">
             <button 
-              onClick={() => toggleMetric('freq')}
-              className={cn("flex items-center gap-2 px-2 py-1 rounded-md transition-all", activeMetrics.freq ? "bg-grid-surface ring-1 ring-grid-border/50 shadow-sm" : "opacity-50 hover:opacity-80")}
+              onClick={() => toggleMetric('point')}
+              className={cn("flex items-center gap-2 px-2 py-1 rounded-md transition-all", activeMetrics.point ? "bg-grid-surface ring-1 ring-grid-border/50 shadow-sm" : "opacity-50 hover:opacity-80")}
             >
               <span className="size-2.5 rounded-sm bg-[#3b82f6]" /> 
-              <span className={cn("text-grid-title", !activeMetrics.freq && "text-grid-muted")}>Frequency</span>
+              <span className={cn("text-grid-title", !activeMetrics.point && "text-grid-muted")}>Point Anomaly</span>
             </button>
             <button 
-              onClick={() => toggleMetric('volt')}
-              className={cn("flex items-center gap-2 px-2 py-1 rounded-md transition-all", activeMetrics.volt ? "bg-grid-surface ring-1 ring-grid-border/50 shadow-sm" : "opacity-50 hover:opacity-80")}
+              onClick={() => toggleMetric('collective')}
+              className={cn("flex items-center gap-2 px-2 py-1 rounded-md transition-all", activeMetrics.collective ? "bg-grid-surface ring-1 ring-grid-border/50 shadow-sm" : "opacity-50 hover:opacity-80")}
             >
               <span className="size-2.5 rounded-sm bg-[#8b5cf6]" /> 
-              <span className={cn("text-grid-title", !activeMetrics.volt && "text-grid-muted")}>Voltage</span>
+              <span className={cn("text-grid-title", !activeMetrics.collective && "text-grid-muted")}>Collective Anomaly</span>
             </button>
             <button 
-              onClick={() => toggleMetric('therm')}
-              className={cn("flex items-center gap-2 px-2 py-1 rounded-md transition-all", activeMetrics.therm ? "bg-grid-surface ring-1 ring-grid-border/50 shadow-sm" : "opacity-50 hover:opacity-80")}
+              onClick={() => toggleMetric('contextual')}
+              className={cn("flex items-center gap-2 px-2 py-1 rounded-md transition-all", activeMetrics.contextual ? "bg-grid-surface ring-1 ring-grid-border/50 shadow-sm" : "opacity-50 hover:opacity-80")}
             >
               <span className="size-2.5 rounded-sm bg-[#ef4444]" /> 
-              <span className={cn("text-grid-title", !activeMetrics.therm && "text-grid-muted")}>Thermal</span>
+              <span className={cn("text-grid-title", !activeMetrics.contextual && "text-grid-muted")}>Contextual Anomaly</span>
             </button>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -243,7 +298,6 @@ export default function LiveMonitoringView() {
                 className="w-full sm:w-auto appearance-none bg-grid-surface/80 border border-grid-border/60 text-grid-title text-[11px] font-medium tracking-wide rounded-md pl-8 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-grid-border cursor-pointer hover:bg-grid-surface"
               >
                 {SENSORS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                <option value="more">Load all 50+ sensors...</option>
               </select>
               <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-grid-muted text-[10px]">▼</div>
             </div>
@@ -271,15 +325,15 @@ export default function LiveMonitoringView() {
           </div>
 
           <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-            {/* Frequency (blueish) scaled 49.8 to 50.2 */}
-            {activeMetrics.freq && renderPath('freq', '#3b82f6', 49.8, 50.2)}
-            {/* Voltage (purple) scaled 225 to 235 */}
-            {activeMetrics.volt && renderPath('volt', '#8b5cf6', 225, 235)}
-            {/* Thermal (red) scaled 20 to 90 */}
-            {activeMetrics.therm && renderPath('therm', '#ef4444', 20, 90)}
+            {/* Point (blueish) */}
+            {activeMetrics.point && renderPath('point', '#3b82f6', 0, 0.5)}
+            {/* Collective (purple) */}
+            {activeMetrics.collective && renderPath('collective', '#8b5cf6', 0, 0.5)}
+            {/* Contextual (red) */}
+            {activeMetrics.contextual && renderPath('contextual', '#ef4444', 0, 0.5)}
           </svg>
           
-          {/* Scanning line effect hiding the right edge to look like it's sliding in */}
+          {/* Scanning line effect */}
           {isLive && (
             <div className="absolute top-0 bottom-0 right-0 w-24 bg-gradient-to-r from-transparent to-grid-page z-10" />
           )}

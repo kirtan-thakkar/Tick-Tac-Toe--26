@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatedList } from "@/components/ui/animated-list";
 
 // --- DATA ---
-const overviewMetrics = [
+const initialOverviewMetrics = [
   {
     label: "Total Active Anomalies",
     value: "28",
@@ -152,30 +152,25 @@ function normalizeChartPayload(payload) {
   return normalized.length > 1 ? normalized : fallbackChartPoints;
 }
 
-function buildLinePath(points, width, height, padding) {
+function buildLinePath(points) {
   const values = points.map((p) => p.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = Math.max(max - min, 1);
-  const usableWidth = width - padding * 2;
-  const usableHeight = height - padding * 2;
 
   return points
     .map((point, index) => {
-      const x = padding + (index / (points.length - 1)) * usableWidth;
-      const y = padding + (1 - (point.value - min) / range) * usableHeight;
+      const x = (index / (points.length - 1)) * 100;
+      const y = 100 - ((point.value - min) / range) * 100;
       return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");
 }
 
-function buildAreaPath(points, width, height, padding) {
-  const line = buildLinePath(points, width, height, padding);
+function buildAreaPath(points) {
+  const line = buildLinePath(points);
   if (!line) return "";
-  const firstX = padding;
-  const lastX = width - padding;
-  const bottomY = height - padding;
-  return `${line} L${lastX.toFixed(2)},${bottomY} L${firstX},${bottomY} Z`;
+  return `${line} L100,100 L0,100 Z`;
 }
 
 function Trend({ trend, delta }) {
@@ -314,7 +309,10 @@ function OverviewChart({ points, loading, error, onRefresh, lastUpdated }) {
       
       <div className="mt-3 flex justify-between text-[10px] text-grid-muted z-10">
         <span>{loading ? "Syncing data..." : "Up to date"}</span>
-        <span>{error ? `Fallback loaded` : lastUpdated}</span>
+        <div className="flex items-center gap-2">
+          {error && <span className="text-grid-danger">{error}</span>}
+          <span>{lastUpdated}</span>
+        </div>
       </div>
     </div>
   );
@@ -325,6 +323,8 @@ export default function OverviewView({ onInvestigate }) {
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState("");
   const [chartLastUpdated, setChartLastUpdated] = useState("never");
+  const [overviewMetrics, setOverviewMetrics] = useState(initialOverviewMetrics);
+  const [metricsLoading, setMetricsLoading] = useState(true);
 
   // Simulated Model Scores for Anomaly Detection
   const [modelScores, setModelScores] = useState({
@@ -333,14 +333,88 @@ export default function OverviewView({ onInvestigate }) {
     lstm: 0.18,
   });
 
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      setMetricsLoading(true);
+      try {
+        const baseUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL ||
+          process.env.NEXT_PUBLIC_API_URL ||
+          "http://localhost:8000";
+        const res = await fetch(`${baseUrl}/api/overview/metrics`, {
+          cache: "no-store"
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        
+        // Convert renewablesSplit object to array format
+        const renewablesSplitArray = data.renewablesSplit 
+          ? Object.entries(data.renewablesSplit).map(([key, val]) => {
+              const sourceMap = { 
+                wind: "Wind", 
+                solar: "Solar", 
+                hydro: "Hydro" 
+              };
+              return {
+                source: sourceMap[key] || key,
+                value: `${val}%`
+              };
+            })
+          : [];
+        
+        setOverviewMetrics([
+          { 
+            label: "Total Active Anomalies", 
+            value: String(data.totalActiveAnomalies || 0), 
+            delta: "-3", 
+            trend: "down", 
+            note: "Compared with previous 24h" 
+          },
+          { 
+            label: "Critical", 
+            value: String(data.critical || 0), 
+            delta: "+1", 
+            trend: "up", 
+            note: "Requires immediate triage" 
+          },
+          { 
+            label: "Warning", 
+            value: String(data.warning || 0), 
+            delta: "-2", 
+            trend: "down", 
+            note: "Investigating in progress" 
+          },
+          { 
+            label: "Info", 
+            value: String(data.info || 0), 
+            trend: "flat", 
+            note: "Observed, no action required" 
+          },
+          { label: "System Health", value: `${data.systemHealthPercent}%`, delta: "+0.6%", trend: "up", note: "Signal ingestion and model uptime" },
+          { label: "Renewables Share", value: `${data.renewablesSharePercent}%`, trend: "flat", split: renewablesSplitArray },
+        ]);
+        setMetricsLoading(false);
+      } catch (err) {
+        console.error("Failed to fetch overview metrics:", err);
+        setMetricsLoading(false);
+        // Keep showing initial data on error
+      }
+    };
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchChartData = async () => {
     setChartLoading(true);
     setChartError("");
-    const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
-    const chartPath = process.env.NEXT_PUBLIC_CHARTS_PATH || "/chats/chart";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://localhost:8000";
 
     try {
-      const response = await fetch(`${baseUrl}${chartPath}`, {
+      const response = await fetch(`${baseUrl}/api/charts/chart?hours=24&bucket=15`, {
         headers: { Accept: "application/json" },
         cache: "no-store",
       });
@@ -350,7 +424,7 @@ export default function OverviewView({ onInvestigate }) {
       setChartLastUpdated(new Date().toLocaleTimeString());
     } catch (error) {
       setChartError(error instanceof Error ? error.message : "Request failed");
-      setChartPoints(fallbackChartPoints);
+      // Do not use fallback if it crashes, keep previous or fallback points.
       setChartLastUpdated(new Date().toLocaleTimeString());
     } finally {
       setChartLoading(false);
@@ -359,6 +433,8 @@ export default function OverviewView({ onInvestigate }) {
 
   useEffect(() => {
     fetchChartData();
+    const interval = setInterval(fetchChartData, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -379,6 +455,15 @@ export default function OverviewView({ onInvestigate }) {
     (modelScores.lstm * weights.lstm);
   
   const isAnomaly = weightedMean > 0.4;
+  const primaryCardLabels = [
+    "Total Active Anomalies",
+    "Critical",
+    "Warning",
+    "Info",
+  ];
+  const primaryCards = primaryCardLabels
+    .map((label) => overviewMetrics.find((metric) => metric.label === label))
+    .filter(Boolean);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-8">
@@ -431,26 +516,37 @@ export default function OverviewView({ onInvestigate }) {
 
       {/* 2. KPI Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {overviewMetrics.slice(0, 4).map((metric, i) => (
+        {primaryCards.map((metric, i) => (
           <motion.div
             key={metric.label}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="bg-grid-surface/20 border border-grid-border/40 rounded-xl p-5 ring-1 ring-grid-border/30 hover:bg-grid-surface/40 transition-colors"
+            className="bg-grid-surface/20 border border-grid-border/40 rounded-xl p-5 ring-1 ring-grid-border/30 hover:bg-grid-surface/40 transition-colors relative overflow-hidden"
           >
+            {metricsLoading && i < 4 && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-grid-surface/20 to-transparent animate-pulse" />
+            )}
             <div className="flex items-start justify-between gap-3 mb-4">
               <p className="text-xs font-semibold tracking-wider text-grid-muted uppercase">
                 {metric.label}
               </p>
-              <Trend trend={metric.trend} delta={metric.delta} />
+              {metric.delta && <Trend trend={metric.trend} delta={metric.delta} />}
             </div>
             <div className="flex items-baseline gap-2">
-              <p className={cn(
-                "text-3xl font-semibold tracking-tight",
-                metric.label === "Critical" ? "text-grid-danger" :
-                metric.label === "Warning" ? "text-grid-warning" : "text-grid-title"
-              )}>{metric.value}</p>
+              <motion.span
+                key={`${metric.label}-${metric.value}`}
+                initial={{ opacity: 0.7, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className={cn(
+                  "text-3xl font-semibold tracking-tight font-mono",
+                  metric.label === "Critical" ? "text-grid-danger" :
+                  metric.label === "Warning" ? "text-grid-warning" : "text-grid-title"
+                )}
+              >
+                {metric.value}
+              </motion.span>
             </div>
             <p className="text-[10px] text-grid-muted mt-2 uppercase tracking-wider">{metric.note}</p>
           </motion.div>
@@ -557,7 +653,7 @@ export default function OverviewView({ onInvestigate }) {
           </div>
 
           <div className="space-y-4 flex-1">
-            {overviewMetrics[5].split.map((item, idx) => (
+            {overviewMetrics[5].split && overviewMetrics[5].split.map((item, idx) => (
               <div key={item.source} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="inline-flex items-center gap-1.5 font-medium text-grid-title">
@@ -571,7 +667,7 @@ export default function OverviewView({ onInvestigate }) {
                 <div className="h-1.5 w-full bg-grid-surface rounded-full overflow-hidden">
                   <motion.div 
                     initial={{ width: 0 }}
-                    animate={{ width: item.value }}
+                    animate={{ width: item.value || "0%" }}
                     transition={{ duration: 1, delay: idx * 0.1 }}
                     className={cn(
                       "h-full rounded-full",

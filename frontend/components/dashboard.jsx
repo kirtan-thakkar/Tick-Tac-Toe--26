@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import AIAgent from "./AIAgent";
 import AssetsView from "./AssetsView";
 import AnomaliesView from "./AnomaliesView";
@@ -10,8 +10,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { signOut } from "next-auth/react";
 import {
   Activity,
-  Bot,
   Building2,
+  MessageCircle,
   Home,
   Menu,
   Search,
@@ -46,11 +46,6 @@ const essentialTabs = [
     icon: Building2,
     description: "Unified equipment and sensor health view",
   },
-  {
-    label: "AI Assistant",
-    icon: Bot,
-    description: "RAG-powered investigation and mitigation",
-  },
 ];
 
 export default function Dashboard() {
@@ -58,6 +53,53 @@ export default function Dashboard() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("Overview");
   const [activeAnomaly, setActiveAnomaly] = useState(null);
+  const [isAIAgentOpen, setIsAIAgentOpen] = useState(false);
+  const [liveStatus, setLiveStatus] = useState("Stable");
+  const [ensembleScore, setEnsembleScore] = useState(0);
+  const [isRetraining, setIsRetraining] = useState(false);
+
+  useEffect(() => {
+    const fetchLive = async () => {
+      try {
+        const baseUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL ||
+          process.env.NEXT_PUBLIC_API_URL ||
+          "http://localhost:8000";
+        const res = await fetch(`${baseUrl}/anomalies/live`);
+        if (!res.ok) throw new Error("HTTP Error");
+        const data = await res.json();
+        setLiveStatus(data.status || "Stable");
+        setEnsembleScore(data.current_ensemble_score || 0);
+      } catch (err) {
+        console.error("Failed to fetch live status", err);
+      }
+    };
+    fetchLive();
+    const interval = setInterval(fetchLive, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRetrain = async () => {
+    setIsRetraining(true);
+    try {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL ||
+        process.env.NEXT_PUBLIC_API_URL ||
+        "http://localhost:8000";
+      const res = await fetch(`${baseUrl}/feedback/retrain`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        alert(data.message || "Model retrained successfully");
+      } else {
+        alert("Failed to retrain model");
+      }
+    } catch (err) {
+      alert("Error triggering retrain");
+    } finally {
+      setIsRetraining(false);
+    }
+  };
+
 
   return (
     <div ref={rootRef} className="min-h-screen bg-grid-page text-grid-title">
@@ -205,10 +247,21 @@ export default function Dashboard() {
                 />
               </div>
 
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-grid-success/30 bg-grid-pill px-3 py-1 text-xs font-semibold text-grid-pill-foreground">
-                <span className="size-1.5 rounded-full bg-grid-success" />
-                Platform Status: Stable | 99.3% pipeline uptime
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-grid-success/30 bg-grid-pill px-3 py-1 text-xs font-semibold text-grid-pill-foreground">
+                  <span className="size-1.5 rounded-full bg-grid-success animate-pulse" />
+                  Status: {liveStatus} | Score: {ensembleScore.toFixed(2)}
+                </span>
+                <Button
+                  onClick={handleRetrain}
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs bg-grid-surface/50 border-grid-border"
+                  disabled={isRetraining}
+                >
+                  {isRetraining ? "Retraining..." : "Retrain Model"}
+                </Button>
+              </div>
               
               <div className="ml-auto flex items-center">
                 <Button
@@ -226,20 +279,7 @@ export default function Dashboard() {
 
           <main className="space-y-6 px-4 pb-8 pt-5 sm:px-6 lg:px-8">
             <AnimatePresence mode="wait" initial={false}>
-              {activeTab === "AI Assistant" ? (
-                <motion.div
-                  key="tab-ai-assistant"
-                  initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -8, filter: "blur(8px)" }}
-                  transition={{ duration: 0.24, ease: "easeOut" }}
-                >
-                  <AIAgent
-                    contextAnomaly={activeAnomaly}
-                    onClearContext={() => setActiveAnomaly(null)}
-                  />
-                </motion.div>
-              ) : activeTab === "Assets" ? (
+              {activeTab === "Assets" ? (
                 <motion.div
                   key="tab-assets"
                   initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
@@ -257,7 +297,7 @@ export default function Dashboard() {
                         status: "Open",
                         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                       });
-                      setActiveTab("AI Assistant");
+                      setIsAIAgentOpen(true);
                     }}
                   />
                 </motion.div>
@@ -282,7 +322,7 @@ export default function Dashboard() {
                   <AnomaliesView
                     onInvestigate={(anomaly) => {
                       setActiveAnomaly(anomaly);
-                      setActiveTab("AI Assistant");
+                      setIsAIAgentOpen(true);
                     }}
                   />
                 </motion.div>
@@ -297,13 +337,42 @@ export default function Dashboard() {
                   <OverviewView
                     onInvestigate={(anomaly) => {
                       setActiveAnomaly(anomaly);
-                      setActiveTab("AI Assistant");
+                      setIsAIAgentOpen(true);
                     }}
                   />
                 </motion.div>
               ) : null}
             </AnimatePresence>
           </main>
+
+          <div className="fixed bottom-5 right-5 z-50">
+            <Button
+              type="button"
+              onClick={() => setIsAIAgentOpen((prev) => !prev)}
+              className="h-12 w-12 rounded-full border border-grid-border bg-grid-surface text-grid-title shadow-lg hover:bg-grid-elevated"
+              aria-label={isAIAgentOpen ? "Close AI assistant" : "Open AI assistant"}
+            >
+              {isAIAgentOpen ? <X className="size-5" /> : <MessageCircle className="size-5" />}
+            </Button>
+          </div>
+
+          <AnimatePresence>
+            {isAIAgentOpen ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.98 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="fixed bottom-20 right-5 z-50 h-[82vh] w-[min(920px,calc(100vw-2rem))]"
+              >
+                <AIAgent
+                  embedded
+                  contextAnomaly={activeAnomaly}
+                  onClearContext={() => setActiveAnomaly(null)}
+                />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
       </div>
     </div>

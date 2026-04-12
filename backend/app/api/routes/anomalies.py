@@ -18,9 +18,20 @@ def severity_to_order(severity: str) -> int:
     return order_map.get(severity.lower(), 3)
 
 
-def compute_incident_id(timestamp: int, asset_id: str) -> str:
-    """Generate unique incident ID from timestamp and asset"""
-    return f"INC-{int(timestamp)}-{asset_id[:3].upper()}"
+import hashlib
+
+def compute_incident_id(anomaly_data: dict) -> str:
+    """Generate unique incident ID from timestamp, asset, and data hash"""
+    ts = anomaly_data.get("timestamp", int(datetime.now().timestamp()))
+    affected_sensors = anomaly_data.get("affected_sensors", [])
+    asset_id = affected_sensors[0] if affected_sensors else "UNK"
+    
+    # Create a stable hash of the anomaly data to ensure uniqueness
+    # We use a subset of the data for the hash to keep it short but unique
+    data_str = f"{ts}-{asset_id}-{anomaly_data.get('ensemble_score', 0)}"
+    data_hash = hashlib.md5(data_str.encode()).hexdigest()[:4].upper()
+    
+    return f"INC-{int(ts)}-{asset_id[:3].upper()}-{data_hash}"
 
 
 def enrich_anomaly_as_incident(anomaly_data: dict) -> dict:
@@ -72,7 +83,7 @@ def enrich_anomaly_as_incident(anomaly_data: dict) -> dict:
             hypothesis = "Contextual anomaly: behavior deviates from historical patterns."
         
         return {
-            "id": compute_incident_id(ts, primary_asset),
+            "id": compute_incident_id(anomaly_data),
             "title": title,
             "severity": display_severity,
             "asset": primary_asset,

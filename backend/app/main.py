@@ -2,10 +2,24 @@ from fastapi import FastAPI
 from app.api.routes import signals, anomalies, feedback, assets, overview, charts, logs
 import threading
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.workers.worker import start_analysis_worker
 
 
 app = FastAPI(title="SentinelIQ API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # include routes
 app.include_router(signals.router, prefix="/signals", tags=["Signals"])

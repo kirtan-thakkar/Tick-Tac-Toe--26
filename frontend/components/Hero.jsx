@@ -56,11 +56,12 @@ const generateInitialData = (pts = 40) => {
 };
 
 function HeroGraph() {
-    const [data, setData] = useState([]);
+    const [data, setData] = useState(() => generateInitialData());
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        setData(generateInitialData());
+        // setData(generateInitialData());
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsMounted(true);
     }, []);
 

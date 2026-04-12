@@ -2,7 +2,7 @@
 
 import { useCompletion } from "@ai-sdk/react";
 import { useState, useEffect, useRef } from "react";
-import { Bot, Send, Sparkles, Terminal, Activity, Zap, Info, ShieldAlert, Cpu } from "lucide-react";
+import { Bot, Send, Sparkles, Terminal, Activity, Zap, Info, ShieldAlert, Cpu, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -154,7 +154,7 @@ function StreamingState({ completion, isLoading }) {
                 isDone ? "text-grid-muted" : "text-grid-muted/50"
               )}>{step}</span>
               {index < steps.length - 1 && (
-                <div className="hidden sm:block h-[1px] flex-1 bg-gradient-to-r from-grid-border/50 to-transparent ml-2" />
+                <div className="hidden sm:block h-px flex-1 bg-linear-to-r from-grid-border/50 to-transparent ml-2" />
               )}
             </div>
           );
@@ -164,11 +164,11 @@ function StreamingState({ completion, isLoading }) {
   );
 }
 
-function AIResponseView({ text, isLoading }) {
+function AIResponseView({ text, isLoading, embedded = false }) {
   const blocks = parseResponseBlocks(text);
 
   return (
-    <div className="flex w-full gap-4 max-w-4xl mx-auto">
+    <div className={cn("flex w-full gap-4", embedded ? "max-w-none" : "max-w-4xl mx-auto")}>
       <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.1)] mt-1">
         <Bot className="size-5 text-emerald-500" />
       </div>
@@ -181,15 +181,15 @@ function AIResponseView({ text, isLoading }) {
         <StreamingState completion={text} isLoading={isLoading} />
         
         {(blocks.length > 0 || (!isLoading && text)) && (
-          <div className="bg-grid-surface/60 border border-grid-border/80 rounded-2xl rounded-tl-sm p-5 text-sm leading-relaxed text-grid-title shadow-sm backdrop-blur-sm">
+          <div className="bg-grid-surface border border-grid-border/80 rounded-2xl rounded-tl-sm px-5 py-4 text-[13px] leading-7 text-grid-title shadow-sm">
             {blocks.length === 0 ? (
-              <p className="whitespace-pre-wrap">{text}</p>
+              <p className="whitespace-pre-wrap text-grid-title/95">{text}</p>
             ) : (
               <div className="space-y-4">
                 {blocks.map((block, index) => {
                   if (block.type === "heading") {
                     return (
-                      <h4 key={`h-${index}`} className="text-sm font-bold text-grid-title flex items-center gap-2 mt-6 mb-3 border-b border-grid-border/40 pb-2">
+                      <h4 key={`h-${index}`} className="text-[13px] font-semibold tracking-wide text-grid-title flex items-center gap-2 mt-5 mb-2 border-b border-grid-border/40 pb-2">
                         <Terminal className="size-4 text-emerald-500/70" />
                         {block.value}
                       </h4>
@@ -198,11 +198,11 @@ function AIResponseView({ text, isLoading }) {
 
                   if (block.type === "list") {
                     return (
-                      <ul key={`l-${index}`} className="space-y-2.5 my-3">
+                      <ul key={`l-${index}`} className="space-y-2 my-2.5">
                         {block.value.map((item, itemIndex) => (
                           <li key={`li-${itemIndex}`} className="flex gap-3 items-start">
-                            <span className="mt-[6px] flex size-1.5 shrink-0 rounded-full bg-emerald-500/60 shadow-[0_0_5px_rgba(16,185,129,0.5)]" />
-                            <span className="text-grid-title/90">{item}</span>
+                            <span className="mt-1.5 flex size-1.5 shrink-0 rounded-full bg-emerald-500/60 shadow-[0_0_5px_rgba(16,185,129,0.5)]" />
+                            <span className="text-grid-title/95 leading-6">{item}</span>
                           </li>
                         ))}
                       </ul>
@@ -211,14 +211,14 @@ function AIResponseView({ text, isLoading }) {
 
                   if (block.type === "table") {
                     return (
-                      <div key={`t-${index}`} className="overflow-x-auto rounded-xl border border-grid-border/80 bg-grid-page/50 my-5 shadow-inner">
+                      <div key={`t-${index}`} className="overflow-x-auto rounded-xl border border-grid-border/80 bg-grid-page my-4 shadow-inner">
                         <table className="min-w-full text-xs">
-                          <thead className="bg-grid-surface/80">
+                          <thead className="bg-grid-surface">
                             <tr>
                               {block.value.headers.map((header, i) => (
                                 <th
                                   key={i}
-                                  className="px-4 py-3 text-left font-semibold tracking-wider uppercase text-grid-muted border-b border-grid-border/80"
+                                  className="px-4 py-2.5 text-left font-semibold tracking-wider uppercase text-grid-muted border-b border-grid-border/80"
                                 >
                                   {header}
                                 </th>
@@ -227,9 +227,9 @@ function AIResponseView({ text, isLoading }) {
                           </thead>
                           <tbody className="divide-y divide-grid-border/40">
                             {block.value.rows.map((row, rowIndex) => (
-                              <tr key={`row-${rowIndex}`} className="hover:bg-grid-surface/50 transition-colors">
+                              <tr key={`row-${rowIndex}`} className="hover:bg-grid-surface/60 transition-colors">
                                 {row.map((cell, cellIndex) => (
-                                  <td key={`cell-${rowIndex}-${cellIndex}`} className="px-4 py-2.5 align-top">
+                                  <td key={`cell-${rowIndex}-${cellIndex}`} className="px-4 py-2.5 align-top text-grid-title/90">
                                     {cell}
                                   </td>
                                 ))}
@@ -242,7 +242,7 @@ function AIResponseView({ text, isLoading }) {
                   }
 
                   return (
-                    <p key={`p-${index}`} className="whitespace-pre-wrap text-grid-title/90 leading-7">
+                    <p key={`p-${index}`} className="whitespace-pre-wrap text-grid-title/95 leading-7">
                       {block.value}
                     </p>
                   );
@@ -256,7 +256,7 @@ function AIResponseView({ text, isLoading }) {
   );
 }
 
-const AIAgent = ({ contextAnomaly, onClearContext }) => {
+const AIAgent = ({ contextAnomaly, onClearContext, embedded = false }) => {
   const [submittedPrompt, setSubmittedPrompt] = useState("");
   const messagesEndRef = useRef(null);
   
@@ -294,16 +294,43 @@ Could you explain what might cause this issue, analyze its potential impact, and
     }
   }, [submittedPrompt, completion, isLoading]);
 
+  const handleFeedback = async (verdict) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const body = {
+        timestamp: Math.floor(Date.now() / 1000),
+        operator_id: "OP-001", // Placeholder
+        verdict: verdict,
+        severity_agree: true,
+        notes: `Feedback for prompt: ${submittedPrompt}`
+      };
+      const res = await fetch(`${baseUrl}/feedback/record`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        alert("Feedback recorded. Thank you.");
+      }
+    } catch (err) {
+      console.error("Feedback error", err);
+    }
+  };
+
   const onSubmit = (e) => {
     e.preventDefault();
     if (!input.trim()) return;
     setSubmittedPrompt(input);
-    setInput(""); 
+    setInput("");
     handleSubmit(e);
   };
-
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-120px)] border border-grid-border/80 rounded-2xl overflow-hidden bg-grid-page/40 shadow-xl ring-1 ring-grid-border/50 relative">
+    <div
+      className={cn(
+        "flex flex-col w-full border border-grid-border/80 rounded-2xl overflow-hidden shadow-xl ring-1 ring-grid-border/50 relative",
+        embedded ? "h-full bg-grid-page/95" : "h-[calc(100vh-120px)] bg-grid-page/85"
+      )}
+    >
       {/* Background ambient effect */}
       <div className="absolute top-0 left-1/2 w-3/4 h-1/2 -translate-x-1/2 bg-emerald-500/5 blur-[120px] pointer-events-none rounded-full" />
       
@@ -412,13 +439,31 @@ Could you explain what might cause this issue, analyze its potential impact, and
         )}
 
         {completion && (
-          <div className="flex justify-start">
-            <AIResponseView text={completion} isLoading={isLoading} />
+          <div className="space-y-4">
+            <div className="flex justify-start">
+              <AIResponseView text={completion} isLoading={isLoading} embedded={embedded} />
+            </div>
+            {!isLoading && (
+              <div className="flex justify-start pl-13 gap-3">
+                <button
+                  onClick={() => handleFeedback("true_positive")}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/10 transition-all text-[10px] font-bold uppercase tracking-wider"
+                >
+                  <ShieldCheck className="size-3" /> Correct
+                </button>
+                <button
+                  onClick={() => handleFeedback("false_positive")}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-grid-danger/20 bg-grid-danger/5 text-grid-danger hover:bg-grid-danger/10 transition-all text-[10px] font-bold uppercase tracking-wider"
+                >
+                  <ShieldAlert className="size-3" /> Incorrect
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {isLoading && !completion && (
-          <div className="flex w-full gap-4 max-w-4xl mx-auto">
+          <div className={cn("flex w-full gap-4", embedded ? "max-w-none" : "max-w-4xl mx-auto")}>
             <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.1)] mt-1">
               <Bot className="size-5 text-emerald-500" />
             </div>
@@ -438,11 +483,11 @@ Could you explain what might cause this issue, analyze its potential impact, and
       {/* Input Area */}
       <form
         onSubmit={onSubmit}
-        className="p-5 bg-grid-surface/80 backdrop-blur border-t border-grid-border/80 z-10"
+        className="p-4 bg-grid-surface border-t border-grid-border/80 z-10"
       >
-        <div className="relative flex items-center max-w-4xl mx-auto bg-grid-page/50 border border-grid-border rounded-xl focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/50 transition-all shadow-sm">
+        <div className="flex items-end gap-2 max-w-4xl mx-auto bg-grid-page border border-grid-border rounded-xl p-2 focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/50 transition-all shadow-sm">
           <textarea
-            className="w-full pl-4 pr-24 py-3.5 bg-transparent border-none focus:outline-none focus:ring-0 text-sm transition-all text-grid-title placeholder:text-grid-muted resize-none min-h-[52px] max-h-32 rounded-xl leading-relaxed"
+            className="w-full px-3 py-2.5 bg-transparent border-none focus:outline-none focus:ring-0 text-sm transition-all text-grid-title placeholder:text-grid-muted/90 resize-none min-h-13 max-h-32 rounded-lg leading-relaxed"
             placeholder="Ask about anomalies, root causes, or mitigation steps..."
             value={input}
             onChange={handleInputChange}
@@ -458,7 +503,7 @@ Could you explain what might cause this issue, analyze its potential impact, and
             <button
               type="button"
               onClick={stop}
-              className="absolute right-2 px-4 py-2 bg-grid-danger/20 text-grid-danger border border-grid-danger/30 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-grid-danger/30 transition-all"
+              className="h-10 shrink-0 px-4 bg-grid-danger/20 text-grid-danger border border-grid-danger/30 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-grid-danger/30 transition-all"
             >
               Stop
             </button>
@@ -466,7 +511,7 @@ Could you explain what might cause this issue, analyze its potential impact, and
             <button
               type="submit"
               disabled={!input.trim()}
-              className="absolute right-2 px-4 py-2 bg-emerald-500/90 text-white text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-emerald-500 disabled:opacity-50 disabled:hover:bg-emerald-500/90 transition-all flex items-center gap-2 shadow-sm"
+              className="h-10 shrink-0 px-4 bg-emerald-500/90 text-white text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-emerald-500 disabled:opacity-50 disabled:hover:bg-emerald-500/90 transition-all flex items-center gap-2 shadow-sm"
             >
               <Send className="size-3.5" />
               Send

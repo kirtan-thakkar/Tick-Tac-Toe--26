@@ -100,6 +100,8 @@ export default function AssetsView({ onInvestigateAsset }) {
 
   useEffect(() => {
     fetchAssets();
+    const interval = setInterval(fetchAssets, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   // Compute counts for the new health-based filter
