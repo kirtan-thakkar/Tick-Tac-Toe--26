@@ -164,6 +164,7 @@ export default function AnomaliesView({ onInvestigate }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           timestamp: typeof anomaly.timestamp === "number" ? anomaly.timestamp : Math.floor(Date.now() / 1000),
+          incident_id: anomaly.id,
           operator_id: "OP-001",
           verdict,
           severity_agree: true,

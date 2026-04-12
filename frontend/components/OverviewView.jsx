@@ -8,14 +8,11 @@ import {
   ArrowUp,
   CheckCircle2,
   Clock3,
-  Wind,
-  Sun,
-  Zap,
   ShieldCheck,
   ChevronRight,
   ShieldAlert,
   Server,
-  ZapOff,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -57,42 +54,14 @@ const initialOverviewMetrics = [
     trend: "up",
     note: "Signal ingestion and model uptime",
   },
-  {
-    label: "Renewables Share",
-    value: "57.4%",
-    trend: "flat",
-    split: [
-      { source: "Wind", value: "31%" },
-      { source: "Solar", value: "22%" },
-      { source: "Hydro", value: "4.4%" },
-    ],
-  },
 ];
 
-const liveFeedItems = [
+const initialLiveFeedItems = [
   {
     id: "feed-1",
-    title: "Dispatch acknowledged",
-    detail: "Critical thermal anomaly moved to Investigating",
-    time: "09:14",
-  },
-  {
-    id: "feed-2",
-    title: "Correlation spike detected",
-    detail: "Feeder load and vibration trend diverged from baseline",
-    time: "09:13",
-  },
-  {
-    id: "feed-3",
-    title: "AI Assistant recommendation",
-    detail: "Suggest temporary load redistribution to TX-AT-019",
-    time: "09:12",
-  },
-  {
-    id: "feed-4",
-    title: "Root-cause explanation updated",
-    detail: "Likely insulation aging under peak thermal stress",
-    time: "09:11",
+    title: "Detection stream connected",
+    detail: "Waiting for model updates",
+    time: "--:--",
   },
 ];
 
@@ -134,6 +103,48 @@ function computeTrend(current, previous, isPercentage = false) {
     trend: diff > 0 ? "up" : "down",
     delta: `${diff > 0 ? "+" : ""}${isPercentage ? diff.toFixed(1) : Math.round(diff)}${isPercentage ? "%" : ""}`,
   };
+}
+
+function parseMetricValue(metrics, label) {
+  const raw = metrics.find((metric) => metric.label === label)?.value ?? "0";
+  return Number.parseFloat(String(raw).replace("%", "")) || 0;
+}
+
+function buildLiveFeed(modelScores, weightedMean, metrics) {
+  const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const critical = parseMetricValue(metrics, "Critical");
+  const warning = parseMetricValue(metrics, "Warning");
+  const total = parseMetricValue(metrics, "Total Active Anomalies");
+
+  const riskState = weightedMean >= 0.45 ? "High" : weightedMean >= 0.3 ? "Elevated" : "Nominal";
+  const topModel = Object.entries(modelScores).sort((a, b) => b[1] - a[1])[0];
+
+  return [
+    {
+      id: `feed-risk-${now}`,
+      title: `Risk posture: ${riskState}`,
+      detail: `Ensemble score ${weightedMean.toFixed(2)} with ${total} active anomalies.`,
+      time: now,
+    },
+    {
+      id: `feed-model-${now}`,
+      title: `${topModel[0]} model leading detections`,
+      detail: `Current score ${topModel[1].toFixed(2)} is highest among active detectors.`,
+      time: now,
+    },
+    {
+      id: `feed-critical-${now}`,
+      title: critical > 0 ? "Critical queue requires action" : "No critical queue pressure",
+      detail: critical > 0 ? `${critical} critical incidents awaiting triage.` : "Critical anomaly count is currently zero.",
+      time: now,
+    },
+    {
+      id: `feed-warning-${now}`,
+      title: "Warning stream update",
+      detail: `${warning} warning-level anomalies are being tracked in real time.`,
+      time: now,
+    },
+  ];
 }
 
 function Trend({ trend, delta }) {
@@ -185,6 +196,7 @@ export default function OverviewView({ onInvestigate }) {
   const [overviewMetrics, setOverviewMetrics] = useState(initialOverviewMetrics);
   const [metricsLoading, setMetricsLoading] = useState(true);
   const previousMetricsRef = useRef();
+  const [liveFeedItems, setLiveFeedItems] = useState(initialLiveFeedItems);
 
   // Simulated Model Scores for Anomaly Detection
   const [modelScores, setModelScores] = useState({
@@ -219,21 +231,6 @@ export default function OverviewView({ onInvestigate }) {
         const warningTrend = computeTrend(totals.warning, previous?.warning);
         const infoTrend = computeTrend(totals.info, previous?.info);
         const healthTrend = computeTrend(totals.systemHealthPercent, previous?.systemHealthPercent, true);
-        
-        // Convert renewablesSplit object to array format
-        const renewablesSplitArray = data.renewablesSplit 
-          ? Object.entries(data.renewablesSplit).map(([key, val]) => {
-              const sourceMap = { 
-                wind: "Wind", 
-                solar: "Solar", 
-                hydro: "Hydro" 
-              };
-              return {
-                source: sourceMap[key] || key,
-                value: `${val}%`
-              };
-            })
-          : [];
         
         setOverviewMetrics([
           { 
@@ -271,7 +268,6 @@ export default function OverviewView({ onInvestigate }) {
             trend: healthTrend.trend,
             note: "Signal ingestion and model uptime",
           },
-          { label: "Renewables Share", value: `${data.renewablesSharePercent}%`, trend: "flat", split: renewablesSplitArray },
         ]);
         previousMetricsRef.current = totals;
         setMetricsLoading(false);
@@ -304,6 +300,11 @@ export default function OverviewView({ onInvestigate }) {
     (modelScores.lstm * weights.lstm);
   
   const isAnomaly = weightedMean > 0.4;
+  const criticalCount = parseMetricValue(overviewMetrics, "Critical");
+  const warningCount = parseMetricValue(overviewMetrics, "Warning");
+  const infoCount = parseMetricValue(overviewMetrics, "Info");
+  const totalActiveCount = parseMetricValue(overviewMetrics, "Total Active Anomalies");
+  const healthPercent = parseMetricValue(overviewMetrics, "System Health");
   const primaryCardLabels = [
     "Total Active Anomalies",
     "Critical",
@@ -313,6 +314,10 @@ export default function OverviewView({ onInvestigate }) {
   const primaryCards = primaryCardLabels
     .map((label) => overviewMetrics.find((metric) => metric.label === label))
     .filter(Boolean);
+
+  useEffect(() => {
+    setLiveFeedItems(buildLiveFeed(modelScores, weightedMean, overviewMetrics));
+  }, [modelScores, overviewMetrics, weightedMean]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-8">
@@ -445,7 +450,7 @@ export default function OverviewView({ onInvestigate }) {
         </div>
       </div>
 
-      {/* 4. Live Feed & Renewables */}
+      {/* 4. Live Feed & Detection Posture */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Live Feed */}
@@ -473,47 +478,56 @@ export default function OverviewView({ onInvestigate }) {
           </AnimatedList>
         </div>
 
-        {/* Renewables Share */}
+        {/* Detection Posture */}
         <div className="bg-grid-surface/20 border border-grid-border/40 rounded-xl p-5 ring-1 ring-grid-border/30 flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-sm font-semibold tracking-tight flex items-center gap-2">
-              <ZapOff className="size-4 text-grid-muted" />
-              Energy Mix
+              <Brain className="size-4 text-grid-muted" />
+              Detection Posture
             </h3>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-grid-muted">Current</span>
+            <span
+              className={cn(
+                "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border",
+                isAnomaly
+                  ? "text-grid-danger border-grid-danger/30 bg-grid-danger/10"
+                  : "text-grid-success border-grid-success/30 bg-grid-success/10"
+              )}
+            >
+              {isAnomaly ? "Elevated" : "Stable"}
+            </span>
           </div>
           
           <div className="mb-6 flex items-baseline justify-between">
-            <p className="text-xs font-semibold text-grid-muted uppercase tracking-wider">Renewables</p>
-            <p className="text-3xl font-medium tracking-tight text-grid-success">{overviewMetrics[5].value}</p>
+            <p className="text-xs font-semibold text-grid-muted uppercase tracking-wider">Ensemble Score</p>
+            <p className={cn("text-3xl font-medium tracking-tight", isAnomaly ? "text-grid-danger" : "text-grid-success")}>{weightedMean.toFixed(2)}</p>
           </div>
 
           <div className="space-y-4 flex-1">
-            {overviewMetrics[5].split && overviewMetrics[5].split.map((item, idx) => (
-              <div key={item.source} className="space-y-1.5">
+            {[
+              { label: "Critical", value: criticalCount, color: "bg-grid-danger" },
+              { label: "Warning", value: warningCount, color: "bg-grid-warning" },
+              { label: "Info", value: infoCount, color: "bg-grid-success" },
+            ].map((item, idx) => (
+              <div key={item.label} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-medium text-grid-title">
-                    {item.source === "Wind" ? <Wind className="size-3 text-[#3b82f6]" /> : 
-                     item.source === "Solar" ? <Sun className="size-3 text-[#eab308]" /> : 
-                     <Zap className="size-3 text-[#8b5cf6]" />}
-                    {item.source}
-                  </span>
+                  <span className="font-medium text-grid-title">{item.label}</span>
                   <span className="font-mono text-grid-muted">{item.value}</span>
                 </div>
                 <div className="h-1.5 w-full bg-grid-surface rounded-full overflow-hidden">
                   <motion.div 
                     initial={{ width: 0 }}
-                    animate={{ width: item.value || "0%" }}
+                    animate={{ width: `${totalActiveCount > 0 ? (item.value / totalActiveCount) * 100 : 0}%` }}
                     transition={{ duration: 1, delay: idx * 0.1 }}
-                    className={cn(
-                      "h-full rounded-full",
-                      item.source === "Wind" ? "bg-[#3b82f6]" : 
-                      item.source === "Solar" ? "bg-[#eab308]" : "bg-[#8b5cf6]"
-                    )}
+                    className={cn("h-full rounded-full", item.color)}
                   />
                 </div>
               </div>
             ))}
+
+            <div className="mt-4 rounded-lg border border-grid-border/40 bg-grid-page/30 p-3 text-xs text-grid-muted space-y-1">
+              <p>Total active anomalies: <span className="font-mono text-grid-title">{totalActiveCount}</span></p>
+              <p>System health: <span className="font-mono text-grid-title">{healthPercent.toFixed(1)}%</span></p>
+            </div>
           </div>
         </div>
       </div>

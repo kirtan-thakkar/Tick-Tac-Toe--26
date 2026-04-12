@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import AIAgent from "./AIAgent";
-import AssetsView from "./AssetsView";
+import FeedbackView from "./FeedbackView";
 import AnomaliesView from "./AnomaliesView";
 import LiveMonitoringView from "./LiveMonitoringView";
 import OverviewView from "./OverviewView";
@@ -10,8 +10,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { signOut } from "next-auth/react";
 import {
   Activity,
-  Building2,
   MessageCircle,
+  MessageSquare,
   Home,
   Menu,
   Search,
@@ -42,9 +42,9 @@ const essentialTabs = [
     description: "Severity, root cause, and resolution status",
   },
   {
-    label: "Assets",
-    icon: Building2,
-    description: "Unified equipment and sensor health view",
+    label: "Feedback",
+    icon: MessageSquare,
+    description: "Operator verdict history and retraining controls",
   },
 ];
 
@@ -279,27 +279,15 @@ export default function Dashboard() {
 
           <main className="space-y-6 px-4 pb-8 pt-5 sm:px-6 lg:px-8">
             <AnimatePresence mode="wait" initial={false}>
-              {activeTab === "Assets" ? (
+              {activeTab === "Feedback" ? (
                 <motion.div
-                  key="tab-assets"
+                  key="tab-feedback"
                   initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
                   animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                   exit={{ opacity: 0, y: -8, filter: "blur(8px)" }}
                   transition={{ duration: 0.24, ease: "easeOut" }}
                 >
-                  <AssetsView
-                    onInvestigateAsset={(asset) => {
-                      setActiveAnomaly({
-                        id: asset.id,
-                        title: `Asset: ${asset.name}`,
-                        severity: asset.health === "Healthy" ? "Info" : asset.health === "Degraded" ? "Warning" : "Critical",
-                        asset: asset.id,
-                        status: "Open",
-                        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                      });
-                      setIsAIAgentOpen(true);
-                    }}
-                  />
+                  <FeedbackView />
                 </motion.div>
               ) : activeTab === "Live Monitoring" ? (
                 <motion.div

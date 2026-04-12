@@ -7,6 +7,7 @@ router = APIRouter()
 
 class FeedbackRequest(BaseModel):
     timestamp: int
+    incident_id: Optional[str] = ""
     operator_id: str
     verdict: str
     severity_agree: bool = True
@@ -17,12 +18,21 @@ async def record_feedback(req: FeedbackRequest):
     try:
         feedback_store.record(
             timestamp=req.timestamp,
+            incident_id=req.incident_id or "",
             operator_id=req.operator_id,
             verdict=req.verdict,
             severity_agree=req.severity_agree,
             notes=req.notes
         )
         return {"status": "success", "message": "Feedback recorded."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/history")
+async def feedback_history(limit: int = 200):
+    try:
+        entries = feedback_store.get_history(limit=limit)
+        return {"count": len(entries), "entries": entries}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

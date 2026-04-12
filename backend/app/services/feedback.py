@@ -1,5 +1,4 @@
-from datetime import datetime
-from influxdb_client import Point
+from influxdb_client import Point, WritePrecision
 from app.core.influx import write_api, query_api
 from app.core.config import settings
 
@@ -7,7 +6,7 @@ class FeedbackStore:
     def __init__(self, bucket=settings.INFLUX_BUCKET):
         self.bucket = bucket
 
-    def record(self, timestamp: int, operator_id: str, verdict: str, severity_agree: bool, notes: str = ""):
+    def record(self, timestamp: int, operator_id: str, verdict: str, severity_agree: bool, notes: str = "", incident_id: str = ""):
         """
         Record operator feedback for an anomaly.
         `timestamp` should be the integer timestamp of the anomaly to correctly associate the feedback.
@@ -16,10 +15,51 @@ class FeedbackStore:
             .tag("operator_id", operator_id) \
             .field("verdict", verdict) \
             .field("severity_agree", severity_agree) \
-            .field("notes", notes) \
-            .time(timestamp)
+            .field("notes", notes)
+
+        if incident_id:
+            point = point.field("incident_id", incident_id)
+
+        point = point.time(timestamp, write_precision=WritePrecision.S)
 
         write_api.write(bucket=self.bucket, record=point)
+
+    def get_history(self, limit: int = 200):
+        """Return recent feedback history entries in descending time order."""
+        query = f'''
+            from(bucket: "{self.bucket}")
+              |> range(start: -30d)
+              |> filter(fn: (r) => r._measurement == "operator_feedback")
+              |> filter(fn: (r) =>
+                  r._field == "verdict" or
+                  r._field == "severity_agree" or
+                  r._field == "notes" or
+                  r._field == "incident_id"
+              )
+              |> pivot(rowKey: ["_time", "operator_id"], columnKey: ["_field"], valueColumn: "_value")
+              |> sort(columns: ["_time"], desc: true)
+              |> limit(n: {limit})
+        '''
+        tables = query_api.query(query, org=settings.INFLUX_ORG)
+
+        entries = []
+        for table in tables:
+            for record in table.records:
+                values = record.values
+                ts = int(record.get_time().timestamp())
+                entries.append(
+                    {
+                        "timestamp": ts,
+                        "recorded_at": ts,
+                        "operator_id": values.get("operator_id", "unknown"),
+                        "verdict": values.get("verdict", ""),
+                        "severity_agree": bool(values.get("severity_agree", True)),
+                        "notes": values.get("notes") or "",
+                        "incident_id": values.get("incident_id") or None,
+                    }
+                )
+
+        return entries
 
     def get_false_positive_rate(self, last_n=100) -> float:
         """Calculate the false positive rate over the last N feedback records."""

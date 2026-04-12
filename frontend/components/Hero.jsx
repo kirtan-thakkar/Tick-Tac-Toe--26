@@ -7,7 +7,7 @@ import {
     Activity,
     ArrowRight,
     Bot,
-    Building2,
+    MessageSquare,
     ShieldAlert,
     ShieldCheck,
 } from "lucide-react";
@@ -34,9 +34,9 @@ const featureCards = [
         icon: ShieldAlert,
     },
     {
-        title: "Assets",
-        description: "Unified asset health view across substations and feeders.",
-        icon: Building2,
+        title: "Feedback",
+        description: "Operator verdict log for model tuning and retraining feedback.",
+        icon: MessageSquare,
     },
     {
         title: "AI Assistant",
